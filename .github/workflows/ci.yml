@@ -1,0 +1,136 @@
+name: CI
+
+# Uses NO secrets, by design: this repo is public, and a pull request from a
+# fork must be able to run the whole thing harmlessly. The only database it
+# touches is a throwaway Postgres service container that lives and dies with
+# the job, so its credentials are literals below rather than repository
+# secrets — there is nothing here worth stealing.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR makes the older run pointless.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: lint · types · build · tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: luach_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Migrations run as the schema OWNER (they CREATE TABLE / CREATE EXTENSION).
+      POSTGRES_ADMIN_URL: postgres://postgres:postgres@localhost:5432/luach_test
+      APP_DB_ROLE: app_user
+      APP_DB_PASSWORD: ci_app_pw
+      # …but the app and the test suite connect as the RESTRICTED role. Families
+      # are isolated by row-level security, and Postgres silently skips RLS for
+      # superusers — pointing the suite at `postgres` here would make the tenant
+      # isolation tests pass without proving anything. See SETUP.md, step 2.
+      DATABASE_URL: postgres://app_user:ci_app_pw@localhost:5432/luach_test
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ---- Database: the documented fresh-install path, end to end ----------
+      # README → "Self-hosting → 1. Database" and SETUP.md steps 1–2.
+
+      - name: Apply the schema and every migration (as the owner)
+        env:
+          DATABASE_URL: ${{ env.POSTGRES_ADMIN_URL }}
+        run: npm run migrate
+
+      - name: Create the restricted app_user role and grant it data privileges
+        run: |
+          node - <<'NODE'
+          const { Client } = require('pg');
+
+          const role = process.env.APP_DB_ROLE;
+          const password = process.env.APP_DB_PASSWORD;
+          if (!/^[a-z_][a-z0-9_]*$/.test(role)) {
+            throw new Error(`Refusing to interpolate an odd role name: ${role}`);
+          }
+
+          // Verbatim from README "Self-hosting → 1. Database" / SETUP.md step 2.
+          const statements = [
+            `CREATE ROLE ${role} LOGIN PASSWORD '${password}'`,
+            `GRANT USAGE ON SCHEMA family_calendar TO ${role}`,
+            `GRANT SELECT, INSERT, UPDATE, DELETE
+               ON ALL TABLES IN SCHEMA family_calendar TO ${role}`,
+            `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA family_calendar TO ${role}`,
+            `GRANT EXECUTE ON FUNCTION family_calendar.redeem_invite(TEXT, INTEGER) TO ${role}`,
+          ];
+
+          (async () => {
+            const client = new Client({ connectionString: process.env.POSTGRES_ADMIN_URL });
+            await client.connect();
+            for (const sql of statements) await client.query(sql);
+
+            // The whole point of the restricted role: if it could bypass RLS the
+            // tenant-isolation tests below would be green and meaningless.
+            const { rows } = await client.query(
+              'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = $1',
+              [role]
+            );
+            if (!rows.length) throw new Error(`${role} was not created`);
+            if (rows[0].rolsuper || rows[0].rolbypassrls) {
+              throw new Error(`${role} bypasses row-level security — refusing to test against it`);
+            }
+
+            await client.end();
+            console.log(`${role} created; row-level security applies to it.`);
+          })().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+          NODE
+
+      # ---- Checks -----------------------------------------------------------
+
+      - name: Lint
+        run: npm run lint
+
+      # `next build` must come before `tsc`: the App Router's route type helpers
+      # (RouteContext, PageProps, LayoutProps) are generated into .next/types,
+      # which tsconfig.json includes. Without it `tsc --noEmit` fails with
+      # "Cannot find name 'RouteContext'".
+      - name: Build
+        run: npx next build
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npx vitest run
