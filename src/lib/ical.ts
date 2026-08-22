@@ -5,6 +5,21 @@ import { getOccurrencesInRange, formatHebrewDate } from '@/lib/hebrew';
 import { solarDateInYear } from '@/lib/solar';
 import { fullName } from '@/lib/names';
 
+/**
+ * The occurrence half of a VEVENT UID: a local-time Date as `yyyymmdd`.
+ *
+ * Deliberately local, matching how the occurrence dates are built (all-day
+ * VEVENTs carry no timezone) — `toISOString()` would shift the day backwards
+ * for any timezone east of UTC and silently change every UID.
+ */
+function uidDay(date: Date): string {
+  return (
+    `${date.getFullYear()}` +
+    `${String(date.getMonth() + 1).padStart(2, '0')}` +
+    `${String(date.getDate()).padStart(2, '0')}`
+  );
+}
+
 /** '18:30' -> '6:30 PM' (timezone-free, for embedding in iCal text). */
 function fmtTimeLabel(t: string): string {
   const [h, m] = t.split(':').map(Number);
@@ -13,6 +28,38 @@ function fmtTimeLabel(t: string): string {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
+/**
+ * Build the subscribable feed.
+ *
+ * ## VEVENT UIDs
+ *
+ * Every VEVENT carries an explicit, deterministic `uid`. Calendar clients key
+ * already-imported entries by UID, so leaving it off (the `ics` library then
+ * mints a random one per call) makes every refresh look like a brand-new set of
+ * events — subscribers accumulate duplicates. The scheme:
+ *
+ *   evt-<events.id>-h-<yyyymmdd>@luach   Hebrew-calendar occurrence
+ *   evt-<events.id>-e-<yyyymmdd>@luach   fixed English birthday occurrence
+ *   gth-<gatherings.id>-<yyyymmdd>@luach one-off gathering
+ *
+ * Three things make each part necessary:
+ *
+ *  - **The date.** One `events` row expands to many VEVENTs (one per year, and
+ *    occasionally two in a year when a Hebrew date recurs either side of the
+ *    Dec/Jan boundary), so the row id alone is not unique within a feed.
+ *  - **The `h`/`e` kind.** A person's Hebrew and English birthdays fall on the
+ *    same Gregorian day whenever the two anniversaries align — by definition in
+ *    the birth year, and periodically thereafter. Same row, same day, two
+ *    genuinely different entries.
+ *  - **The `evt`/`gth` prefix.** `events.id` and `gatherings.id` are independent
+ *    SERIAL sequences on separate tables, so the same integer routinely
+ *    identifies one of each.
+ *
+ * No family id is needed: both tables have a single-column `id SERIAL PRIMARY
+ * KEY` and are shared by all tenants (migrate-v10 added `family_id` as a plain
+ * column, not part of the key), so ids are already globally unique. Keeping the
+ * family out also means a UID survives a family being renamed or re-keyed.
+ */
 export async function generateICalFeed(): Promise<string> {
   const rows = await query<EventWithMember>(`
     SELECT e.*, fm.name, fm.last_name, fm.name_he, fm.family_branch
@@ -47,6 +94,7 @@ export async function generateICalFeed(): Promise<string> {
     // Hebrew calendar occurrences
     for (const date of occurrences) {
       icsEvents.push({
+        uid: `evt-${row.id}-h-${uidDay(date)}@luach`,
         start: [date.getFullYear(), date.getMonth() + 1, date.getDate()],
         duration: { days: 1 },
         title: `${icon} ${feedName(row)}'s Hebrew ${typeLabel}`,
@@ -66,6 +114,7 @@ export async function generateICalFeed(): Promise<string> {
         const date = solarDateInYear(y, engMonth, engDay);
         if (date >= startDate && date <= endDate) {
           icsEvents.push({
+            uid: `evt-${row.id}-e-${uidDay(date)}@luach`,
             start: [date.getFullYear(), date.getMonth() + 1, date.getDate()],
             duration: { days: 1 },
             title: `📅 ${feedName(row)}'s English Birthday`,
@@ -99,6 +148,9 @@ export async function generateICalFeed(): Promise<string> {
       g.description ?? '',
     ].filter(Boolean);
     const base: EventAttributes = {
+      // gather_date is already a zero-padded YYYY-MM-DD (to_char, above), so the
+      // UID day comes straight off the string — no Date round-trip to shift it.
+      uid: `gth-${g.id}-${g.gather_date.replace(/-/g, '')}@luach`,
       start: [gy, gm, gd],
       duration: { days: 1 },
       title: `${gatheringIcon(g.kind)} ${g.title}${timeLabel ? ` · ${timeLabel}` : ''}`,
