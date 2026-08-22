@@ -6,6 +6,7 @@ import { hebrewToGregorianAll, yearsSince } from '@/lib/hebrew';
 import { safeEqual } from '@/lib/safe-equal';
 import { fullName } from '@/lib/names';
 import { oneLine } from '@/lib/text';
+import { configuredSiteUrl } from '@/lib/base-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,17 @@ export async function GET(request: NextRequest) {
   const token = bearer ?? request.nextUrl.searchParams.get('token');
   if (!token || !safeEqual(token, expected)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
+
+  // The digest text carries a link that recipients open on their own phones, so
+  // it has to name THIS deployment. Refuse rather than guess — checked after the
+  // token so the config state isn't reportable to anonymous callers.
+  const siteUrl = configuredSiteUrl();
+  if (!siteUrl) {
+    return NextResponse.json(
+      { error: 'NEXTAUTH_URL not configured on server. Set it to this deployment’s public URL (e.g. https://calendar.example.com) — the digest links to it.' },
+      { status: 500 }
+    );
   }
 
   const familyParam = request.nextUrl.searchParams.get('family');
@@ -164,7 +176,6 @@ export async function GET(request: NextRequest) {
 
     items.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    const siteUrl = process.env.NEXTAUTH_URL || 'https://family-calendar.holzman-ai.com';
     const rangeLabel = `${fmtDay(today)} – ${fmtDay(end)}`;
     let message: string;
     if (items.length === 0) {

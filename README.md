@@ -103,7 +103,7 @@ Fill it in — `.env.example` documents each variable:
 | `SESSION_PASSWORD` | yes | 32+ chars sealing the session cookie — `openssl rand -hex 32` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | yes | Google OAuth 2.0 "Web application" client |
 | `OAUTH_REDIRECT_URI` | yes | `https://<your-domain>/api/auth/google/callback`, registered identically in the Google console |
-| `NEXTAUTH_URL` | in prod | Your public origin, used to build invite and feed URLs |
+| `NEXTAUTH_URL` | in prod | Your public origin, used to build invite and feed URLs. The WhatsApp broadcast feeds **500 rather than guess** if it is unset — there is no default |
 | `N8N_TOKEN` | optional | Bearer token for the automation feeds — **a deployment secret; it reads across families** |
 | `DIGEST_RECIPIENTS` | optional | Extra comma-separated E.164 numbers for digests |
 

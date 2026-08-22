@@ -31,7 +31,9 @@ adds the push half, so relatives hear about a birthday without opening the app.
 3. Two new environment variables on the Family Calendar service:
    - `N8N_TOKEN` — long random string. n8n sends it as `Authorization: Bearer <token>`.
    - `NEXTAUTH_URL` — your public origin, so the links inside the messages point
-     at the right place.
+     at the right place. **Both broadcast endpoints return HTTP 500 naming this
+     variable when it is missing**, rather than falling back to some other
+     deployment and messaging your family a link to a calendar that isn't yours.
 
 ## 1. Phone numbers on each person
 
