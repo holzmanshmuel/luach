@@ -1,4 +1,5 @@
 import { getT, type Lang } from '@/lib/translations';
+import { REPO_URL } from '@/lib/ui';
 
 /**
  * Quiet brand credit, rendered on every view via the root layout.
@@ -36,6 +37,17 @@ export function BuiltByHolzman({ lang }: { lang: Lang }) {
           className="text-ink-muted hover:text-ink transition-colors"
         >
           {t('footer.privacy')}
+        </a>
+        <span aria-hidden="true" className="mx-2 text-ink-faint">
+          ·
+        </span>
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noopener"
+          className="text-ink-muted hover:text-ink transition-colors"
+        >
+          {t('footer.source')}
         </a>
       </p>
     </footer>

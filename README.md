@@ -1,5 +1,9 @@
 # Luach
 
+[![Source on GitHub](https://img.shields.io/badge/source-holzmanshmuel%2Fluach-1D4ED8?logo=github)](https://github.com/holzmanshmuel/luach)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1D4ED8)](./LICENSE)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-1D4ED8?logo=nextdotjs)](https://nextjs.org)
+
 **The Hebrew–English family calendar.** Every birthday, anniversary and
 yahrzeit — on both the Hebrew and the Gregorian date, in both Hebrew and
 English, shared with the whole family.
@@ -232,5 +236,6 @@ Security issues go to [SECURITY.md](./SECURITY.md), not the public tracker.
 
 ---
 
+Source: **[github.com/holzmanshmuel/luach](https://github.com/holzmanshmuel/luach)** ·
 Hosted free at **[family-calendar.holzman-ai.com](https://family-calendar.holzman-ai.com)** ·
 Built by **[Holzman AI & Automations](https://holzman-ai.com)**

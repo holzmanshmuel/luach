@@ -324,6 +324,7 @@ const T: Record<Lang, Record<string, string>> = {
     'footer.built_by': 'Built by',
     'footer.need_help': 'Need help?',
     'footer.privacy': 'Privacy',
+    'footer.source': 'Open source on GitHub',
     // Public landing / welcome page
     'landing.h1': 'The Hebrew–English family calendar',
     'landing.sub': 'Every birthday, anniversary and yahrzeit — in both Hebrew and Gregorian dates, shared with the whole family.',
@@ -339,6 +340,8 @@ const T: Record<Lang, Record<string, string>> = {
     'landing.how.step3': 'Everyone sees it in their language',
     'landing.cta': 'Start your family’s calendar',
     'landing.invite': 'Have an invite link? Just open it.',
+    'landing.source': 'Luach is open source — run it on your own server.',
+    'landing.source_link': 'View the code on GitHub',
   },
   he: {
     // Navigation
@@ -659,6 +662,7 @@ const T: Record<Lang, Record<string, string>> = {
     'footer.built_by': 'נבנה על ידי',
     'footer.need_help': 'צריכים עזרה?',
     'footer.privacy': 'פרטיות',
+    'footer.source': 'קוד פתוח ב‑GitHub',
     // Public landing / welcome page
     'landing.h1': 'לוח השנה המשפחתי — עברי ולועזי',
     'landing.sub': 'כל יום הולדת, יום נישואין ויארצייט — בתאריך עברי ולועזי גם יחד, משותף לכל המשפחה.',
@@ -674,6 +678,8 @@ const T: Record<Lang, Record<string, string>> = {
     'landing.how.step3': 'כל אחד רואה אותו בשפה שלו',
     'landing.cta': 'התחילו את לוח המשפחה שלכם',
     'landing.invite': 'קיבלתם קישור הזמנה? פשוט פתחו אותו.',
+    'landing.source': 'לוּחַ הוא קוד פתוח — אפשר להריץ אותו על שרת משלכם.',
+    'landing.source_link': 'לצפייה בקוד ב‑GitHub',
   },
 };
 

@@ -13,6 +13,12 @@
  * re-exports these so client components have one import site too.
  */
 
+/**
+ * Where this app's source lives. Linked from the footer and the welcome page so
+ * anyone who wants to run their own copy can find it in one click.
+ */
+export const REPO_URL = 'https://github.com/holzmanshmuel/luach';
+
 export const fieldLabel = 'label block mb-1.5';
 
 export const fieldInput =

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { getT, type Lang } from '@/lib/translations';
+import { REPO_URL } from '@/lib/ui';
 
 // Button classes are defined locally rather than imported from Modal.tsx: that
 // module is `'use client'`, and importing a bare string constant from a client
@@ -133,6 +134,20 @@ export default async function WelcomePage() {
             {t('landing.cta')}
           </a>
         </section>
+
+        {/* ── Open source ── quiet, below the CTA: it matters to the few
+             visitors who would rather run their own copy than sign up here. */}
+        <p className="mt-10 text-center text-sm text-ink-muted">
+          {t('landing.source')}{' '}
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener"
+            className="ennote text-ink-2 underline underline-offset-4 decoration-warm-border hover:text-ink hover:decoration-ink transition-colors"
+          >
+            {t('landing.source_link')}
+          </a>
+        </p>
       </div>
     </main>
   );
