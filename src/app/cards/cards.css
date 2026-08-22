@@ -1,0 +1,46 @@
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media print {
+  html, body {
+    background: white !important;
+    color: #1c1917 !important;
+  }
+  .print-hide { display: none !important; }
+  .card-sheet {
+    break-inside: auto;
+  }
+  .card-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+.cards-root {
+  background: white;
+  color: #1c1917;
+  min-height: 100vh;
+  padding: 20mm 10mm;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card-sheet {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10mm;
+}
+
+.card-cell {
+  border: 1.5px dashed #d6d3d1;
+  border-radius: 12px;
+  padding: 10mm 6mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  aspect-ratio: 5 / 7;
+  justify-content: space-between;
+}

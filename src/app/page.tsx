@@ -1,0 +1,197 @@
+export const dynamic = 'force-dynamic';
+
+import { CalendarGrid } from '@/app/components/CalendarGrid';
+import { HebrewCalendarGrid } from '@/app/components/HebrewCalendarGrid';
+import { UpcomingEvents } from '@/app/components/UpcomingEvents';
+import { MonthNav } from '@/app/components/MonthNav';
+import { CalendarLegend } from '@/app/components/CalendarLegend';
+import { OnThisDay } from '@/app/components/OnThisDay';
+import { WelcomeBanner } from '@/app/components/WelcomeBanner';
+import { Header } from '@/app/components/Header';
+import { CombinedModeProvider } from '@/app/components/CombinedModeProvider';
+import { getSession, getSessionInfo, requireAuth } from '@/lib/auth';
+import { getMembershipsForUser } from '@/lib/users';
+import { getGatherings } from '@/app/actions';
+import { getHolidaysForMonth, getHolidaysForHebrewMonth } from '@/lib/holidays';
+import { getZmanimForMonth, getZmanimForHebrewMonth } from '@/lib/zmanim';
+import { buildHebrewMonth, getHebrewMonthForGregorian } from '@/lib/hebrew-calendar';
+import {
+  getEventsForMonth,
+  getEventsForHebrewMonth,
+  getUpcomingEvents,
+  getGatheringsRaw,
+  dbMonthLabels,
+} from '@/lib/calendar-data';
+import { resolveViewFamilies, mapAcrossFamilies, tagWith } from '@/lib/combined';
+import type { CalendarEvent, FamilyTag, Gathering } from '@/lib/types';
+import { cookies } from 'next/headers';
+
+/** Parse a numeric URL param, falling back to a default if missing/NaN/out-of-range. */
+function intParam(v: string | undefined, def: number, min: number, max: number): number {
+  const n = v != null ? parseInt(v, 10) : NaN;
+  return Number.isFinite(n) && n >= min && n <= max ? n : def;
+}
+
+/**
+ * The switcher's checked set: the VALIDATED combined-view families (resolveViewFamilies()
+ * already filtered these to the user's live memberships) when combined mode is active,
+ * else just the single active family — so a plain (non-combined) session shows only its
+ * own family checked, never an empty or stale list, and a revoked membership can't leave
+ * a stale checkbox checked.
+ */
+function resolveSelectedIds(combined: boolean, viewFamilies: FamilyTag[], activeFamilyId: number | null): number[] {
+  if (combined) return viewFamilies.map(f => f.id);
+  return activeFamilyId !== null ? [activeFamilyId] : [];
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string; year?: string; hmonth?: string; hyear?: string }>;
+}) {
+  // Establish tenant context BEFORE any tenant-scoped query() runs. Must be at the
+  // top level of the page fn (awaited here) — NOT folded into the Promise.all
+  // below, because enterTenant() uses AsyncLocalStorage.enterWith(): a sibling
+  // promise in the same Promise.all does not inherit a store entered by another
+  // sibling. The proxy already redirects signed-out traffic to /login, so real
+  // users never hit this throw; it's the fail-closed backstop.
+  await requireAuth();
+
+  // Combined-view resolution: which families to merge (empty/single ⇒ plain
+  // single-family behavior, byte-for-byte unchanged below).
+  const view = await resolveViewFamilies();
+  const combined = view?.mode === 'combined';
+  const viewFamilies = view?.mode === 'combined' ? view.families : [];
+
+  const params = await searchParams;
+  const cookieStore = await cookies();
+  const lang = cookieStore.get('lang')?.value === 'he' ? 'he' : 'en';
+
+  // Cheap system-scoped lookup (not tenant data) for the family switcher — every
+  // membership row for this user, so the header can offer the others. `userId`
+  // is guaranteed set here: requireAuth() above already confirmed a live session.
+  const { userId } = await getSession();
+  const memberships = await getMembershipsForUser(userId!);
+
+  // ── Hebrew mode: Hebrew-month grid ──
+  if (lang === 'he') {
+    const todayHeb = getHebrewMonthForGregorian(new Date());
+    const hMonth = intParam(params.hmonth, todayHeb.hebrewMonth, 1, 13);
+    const hYear = intParam(params.hyear, todayHeb.hebrewYear, 5000, 6000);
+    const model = buildHebrewMonth(hMonth, hYear);
+
+    let hebEvents: CalendarEvent[], upcomingAll: CalendarEvent[], gatherings: Gathering[];
+    if (combined) {
+      const bundles = await mapAcrossFamilies(viewFamilies, async (fam) => ({
+        events: (await getEventsForHebrewMonth(dbMonthLabels(hMonth, hYear), hYear, model)).map(tagWith(fam)),
+        upcoming: (await getUpcomingEvents(50)).map(tagWith(fam)),
+        gatherings: (await getGatheringsRaw()).map(tagWith(fam)),
+      }));
+      hebEvents = bundles.flatMap(b => b.events);
+      upcomingAll = bundles.flatMap(b => b.upcoming)
+        .sort((a, b) => a.gregorianDate.getTime() - b.gregorianDate.getTime());
+      gatherings = bundles.flatMap(b => b.gatherings);
+    } else {
+      [hebEvents, upcomingAll, gatherings] = await Promise.all([
+        getEventsForHebrewMonth(dbMonthLabels(hMonth, hYear), hYear, model),
+        getUpcomingEvents(50),
+        getGatherings(),
+      ]);
+    }
+    const sessionInfo = await getSessionInfo();
+
+    const holidaysRaw = getHolidaysForHebrewMonth(hMonth, hYear);
+    const holidays: Record<number, { name: string; yomTov: boolean; chutzLaaretz: boolean }> = {};
+    for (const [d, h] of Object.entries(holidaysRaw)) {
+      holidays[Number(d)] = { name: h.nameHe, yomTov: h.yomTov, chutzLaaretz: h.chutzLaaretz };
+    }
+    // Candle-lighting / havdalah times (Jerusalem) — family-independent, so
+    // computed once and shared across the combined view too.
+    const zmanim = getZmanimForHebrewMonth(model);
+
+    return (
+      <CombinedModeProvider combined={combined} viewFamilies={viewFamilies}>
+        <div className="min-h-screen bg-parchment">
+          <Header
+            lang="he"
+            isAdmin={sessionInfo.role === 'owner'}
+            memberships={memberships}
+            activeFamilyId={sessionInfo.familyId}
+            selectedIds={resolveSelectedIds(combined, viewFamilies, sessionInfo.familyId)}
+          />
+          <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
+            <div className="flex-1 min-w-0">
+              <WelcomeBanner />
+              <OnThisDay events={upcomingAll} />
+              <MonthNav hebrew={{ model, hMonth, hYear, isCurrent: hMonth === todayHeb.hebrewMonth && hYear === todayHeb.hebrewYear }} />
+              <CalendarLegend />
+              <HebrewCalendarGrid model={model} events={hebEvents} gatherings={gatherings} holidays={holidays} zmanim={zmanim} />
+            </div>
+            <aside className="w-full lg:w-72 shrink-0">
+              <UpcomingEvents events={upcomingAll.slice(0, 10)} />
+            </aside>
+          </div>
+        </div>
+      </CombinedModeProvider>
+    );
+  }
+
+  // ── English mode: Gregorian-month grid (unchanged baseline) ──
+  const today = new Date();
+  const year = intParam(params.year, today.getFullYear(), 1900, 2200);
+  const month = intParam(params.month, today.getMonth(), 0, 11);
+
+  let events: CalendarEvent[], upcomingAll: CalendarEvent[], gatherings: Gathering[];
+  if (combined) {
+    const bundles = await mapAcrossFamilies(viewFamilies, async (fam) => ({
+      events: (await getEventsForMonth(year, month)).map(tagWith(fam)),
+      upcoming: (await getUpcomingEvents(50)).map(tagWith(fam)),
+      gatherings: (await getGatheringsRaw()).map(tagWith(fam)),
+    }));
+    events = bundles.flatMap(b => b.events);
+    upcomingAll = bundles.flatMap(b => b.upcoming)
+      .sort((a, b) => a.gregorianDate.getTime() - b.gregorianDate.getTime());
+    gatherings = bundles.flatMap(b => b.gatherings);
+  } else {
+    [events, upcomingAll, gatherings] = await Promise.all([
+      getEventsForMonth(year, month), getUpcomingEvents(50), getGatherings(),
+    ]);
+  }
+  const sessionInfo = await getSessionInfo();
+  const upcomingEvents = upcomingAll.slice(0, 10);
+  const nextThirtyDaysEvents = upcomingAll;
+
+  const holidaysRaw = getHolidaysForMonth(year, month);
+  const holidays: Record<number, { name: string; yomTov: boolean; chutzLaaretz: boolean }> = {};
+  for (const [d, h] of Object.entries(holidaysRaw)) {
+    holidays[Number(d)] = { name: h.name, yomTov: h.yomTov, chutzLaaretz: h.chutzLaaretz };
+  }
+  // Candle-lighting / havdalah times (Jerusalem) — family-independent.
+  const zmanim = getZmanimForMonth(year, month);
+
+  return (
+    <CombinedModeProvider combined={combined} viewFamilies={viewFamilies}>
+      <div className="min-h-screen bg-parchment">
+        <Header
+          lang="en"
+          isAdmin={sessionInfo.role === 'owner'}
+          memberships={memberships}
+          activeFamilyId={sessionInfo.familyId}
+          selectedIds={resolveSelectedIds(combined, viewFamilies, sessionInfo.familyId)}
+        />
+        <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
+          <div className="flex-1 min-w-0">
+            <WelcomeBanner />
+            <OnThisDay events={nextThirtyDaysEvents} />
+            <MonthNav year={year} month={month} />
+            <CalendarLegend />
+            <CalendarGrid year={year} month={month} events={events} gatherings={gatherings} holidays={holidays} zmanim={zmanim} />
+          </div>
+          <aside className="w-full lg:w-72 shrink-0">
+            <UpcomingEvents events={upcomingEvents} />
+          </aside>
+        </div>
+      </div>
+    </CombinedModeProvider>
+  );
+}
