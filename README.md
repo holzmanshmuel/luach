@@ -18,7 +18,12 @@ out to the people who need them.
 **Hosted free at [family-calendar.holzman-ai.com](https://family-calendar.holzman-ai.com)**
 — or self-host it; the whole thing is in this repo.
 
-<!-- TODO: screenshots — month grid (English + Hebrew), family tree, WhatsApp digest. -->
+![Luach's month grid in English](./docs/screenshots/month-english.png)
+
+*The month grid: birthdays and anniversaries beside Rosh Chodesh and the
+candle-lighting times, with the next occasions down the side. Every person and
+date in these screenshots is from the fictional demo family that ships with the
+repo — see [the demo family](#4-optional--the-demo-family).*
 
 ## What it does
 
@@ -55,6 +60,22 @@ out to the people who need them.
   never manage a login.
 - **Installable PWA** with an offline shell.
 - **A Hebrew date converter**, because someone always asks.
+
+## Screenshots
+
+**The family tree** — three generations, spouses and parents, tinted by branch,
+zoomable and collapsible.
+
+![The demo family's tree, three generations deep](./docs/screenshots/family-tree.png)
+
+**The same screen in Hebrew.** Each viewer picks their own language; the whole
+site follows, right-to-left layout and Hebrew names included.
+
+![The same tree rendered right to left, with Hebrew names](./docs/screenshots/family-tree-hebrew.png)
+
+**The landing page**, for the relatives you still have to talk into it.
+
+![The Luach welcome page](./docs/screenshots/welcome.png)
 
 ## Self-hosting
 
