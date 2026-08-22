@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect, useRef } from 'react';
-import { FAMILY_BRANCHES, EVENT_TYPES, EventType } from '@/lib/types';
+import { EVENT_TYPES, EventType } from '@/lib/types';
 import { Modal, fieldLabel, fieldInput, btnPrimary, btnGhost } from './Modal';
 import { useUserPrefs } from './UserPrefsContext';
 import { createPersonAction, createEventAction, getAllFamilyMembers } from '@/app/actions';
@@ -22,7 +22,7 @@ async function convertGregorianToHebrew(m: number, d: number, y: number) {
 
 
 export function AddPersonModal() {
-  const { spell, t } = useUserPrefs();
+  const { spell, t, branches } = useUserPrefs();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -210,7 +210,7 @@ export function AddPersonModal() {
                 <label className={fieldLabel}>{t('person.branch')}</label>
                 <select aria-label={t('person.branch')} value={branch} onChange={e => setBranch(e.target.value)} className={fieldInput}>
                   <option value="">{t('form.select_branch')}</option>
-                  {FAMILY_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                  {branches.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
 

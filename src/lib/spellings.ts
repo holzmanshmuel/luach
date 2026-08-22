@@ -2,7 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
-import { FAMILY_BRANCHES } from '@/lib/types';
+import { familyBranches } from '@/lib/branches-server';
 import {
   ViewerSpelling,
   buildVariants,
@@ -22,7 +22,7 @@ export const loadBranchVariants = cache(async (): Promise<Record<string, string[
   const rows = await query<{ branch: string; spelling: string }>(
     `SELECT branch, spelling FROM family_calendar.branch_spellings`
   );
-  return buildVariants(FAMILY_BRANCHES, rows);
+  return buildVariants(familyBranches(), rows);
 });
 
 function readChosen(raw: string | undefined): Record<string, string> {

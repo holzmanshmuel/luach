@@ -13,6 +13,14 @@ interface UserPrefs {
   toggleLanguage: () => void;
   toggleNicknames: () => void;
   t: (key: string) => string;
+  /**
+   * The configured family branches, IN ORDER — resolved from the server's
+   * `FAMILY_BRANCHES` and handed down by the root layout. Order is load-bearing:
+   * it decides each branch's colour (see `lib/branches.ts`), and the last entry
+   * is the catch-all. Client components read the list from here rather than from
+   * the environment, which does not exist in the browser.
+   */
+  branches: string[];
   /** branch -> all accepted spellings (branch value first). */
   branchVariants: Record<string, string[]>;
   /** The viewer's explicit per-branch choices (absent = show names as entered). */
@@ -31,6 +39,10 @@ const UserPrefsContext = createContext<UserPrefs>({
   toggleLanguage: () => {},
   toggleNicknames: () => {},
   t: (key) => key,
+  // Empty, not the demo list: the real value always arrives from the root
+  // layout, and inventing branch names here would render a family's picker with
+  // sides they don't have.
+  branches: [],
   branchVariants: {},
   chosen: {},
   spell: (b) => b ?? '',
@@ -46,6 +58,7 @@ export function UserPrefsProvider({
   language, // authoritative, from the server cookie — drives the whole tree
   isAdmin = false,
   canEdit = false,
+  branches,
   spellings = {},
   branchVariants = {},
 }: {
@@ -53,6 +66,8 @@ export function UserPrefsProvider({
   language: Lang;
   isAdmin?: boolean;
   canEdit?: boolean;
+  /** Configured branch list, in order — from `familyBranches()` on the server. */
+  branches: string[];
   spellings?: Record<string, string>;
   branchVariants?: Record<string, string[]>;
 }) {
@@ -102,7 +117,7 @@ export function UserPrefsProvider({
 
   return (
     <UserPrefsContext.Provider
-      value={{ language, showNicknames, isAdmin, canEdit, toggleLanguage, toggleNicknames, t, branchVariants, chosen: spellings, spell, setSpelling }}
+      value={{ language, showNicknames, isAdmin, canEdit, toggleLanguage, toggleNicknames, t, branches, branchVariants, chosen: spellings, spell, setSpelling }}
     >
       {children}
     </UserPrefsContext.Provider>

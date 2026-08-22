@@ -9,18 +9,11 @@ import { getT, type Lang } from '@/lib/translations';
 import { requireAuth } from '@/lib/auth';
 import { fetchTimeline, type TimelineEntry } from '@/lib/calendar-data';
 import { resolveViewFamilies, aggregateAcrossFamilies } from '@/lib/combined';
+import { branchStyle } from '@/lib/branches';
+import { familyBranches } from '@/lib/branches-server';
 
 const EVENT_ICONS: Record<string, string> = {
   birthday: '🎂', anniversary: '💍', yahrtzeit: '🕯️', other: '📅',
-};
-
-// Muted branch accents, matching the avatar palette.
-const BRANCH_ACCENT: Record<string, string> = {
-  Levi:  'border-s-[#4C4F30]',
-  Cohen: 'border-s-[#3C4A3E]',
-  Mizrahi:   'border-s-[#6B4A3E]',
-  Adler:     'border-s-[#6B5A2E]',
-  Other:     'border-s-warm-border',
 };
 
 export default async function TimelinePage() {
@@ -37,6 +30,9 @@ export default async function TimelinePage() {
   const cookieStore = await cookies();
   const lang: Lang = cookieStore.get('lang')?.value === 'he' ? 'he' : 'en';
   const t = getT(lang);
+  // Configured branch list — the accent stripe is chosen by a branch's POSITION
+  // in it (see lib/branches.ts).
+  const branches = familyBranches();
 
   let entries: TimelineEntry[];
   if (combined) {
@@ -87,7 +83,7 @@ export default async function TimelinePage() {
                   </div>
                   <ol className="space-y-4 max-w-2xl mx-auto">
                     {list.map(entry => {
-                      const branchClass = BRANCH_ACCENT[entry.family_branch ?? 'Other'] ?? BRANCH_ACCENT.Other;
+                      const branchClass = branchStyle(branches, entry.family_branch).border;
                       const icon = EVENT_ICONS[entry.event_type] ?? '📅';
                       // Combined (merged) view only — which family this occurrence belongs
                       // to. When set, its color overrides the branch accent stripe.
@@ -101,7 +97,7 @@ export default async function TimelinePage() {
                             style={entry.family ? { borderInlineStartColor: entry.family.color } : undefined}
                           >
                             <div className="flex items-start gap-3">
-                              <Avatar name={entry.name} photoUrl={entry.photo_url} branch={entry.family_branch as never} size="md" />
+                              <Avatar name={entry.name} photoUrl={entry.photo_url} branch={entry.family_branch} size="md" />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs text-ink-faint flex items-center gap-1.5">
                                   <span>{entry.year}{entry.ageOrLabel ? ` · ${entry.ageOrLabel}` : ''}</span>

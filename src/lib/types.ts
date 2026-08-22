@@ -26,29 +26,23 @@ export const EVENT_TYPES: { value: EventType; label: string; icon: string }[] = 
 ];
 
 /**
- * The surnames of the branches your family tree is made of — the "sides" a
- * person can belong to. Used to tint avatars, tree cards and timeline entries,
- * and as the key for the per-viewer surname-spelling feature (see
- * `lib/spelling-core.ts`).
+ * The surname of the branch a person belongs to — the "side" of the family they
+ * are on. Used to tint avatars, tree cards and timeline entries, and as the key
+ * for the per-viewer surname-spelling feature (see `lib/spelling-core.ts`).
  *
- * ── SELF-HOSTERS: THIS IS THE ONE PLACE TO EDIT. ──
- * The values below are placeholders for a fictional demo family. Replace them
- * with your own branch surnames, keeping `'Other'` last (it is the catch-all and
- * is deliberately excluded from the spelling UI, which has no surname to spell).
- * If you change the NUMBER of branches, also add/remove the matching colour
- * entries in `app/components/Avatar.tsx`, `app/components/FamilyTreeClient.tsx`,
- * `app/components/OrgChart.tsx`, `app/components/BranchSpellingsModal.tsx` and
- * `app/timeline/page.tsx` — unknown branches fall back to the neutral tint.
+ * ── SELF-HOSTERS: THIS IS CONFIGURATION, NOT CODE. ──
+ * The list of branches comes from the `FAMILY_BRANCHES` environment variable at
+ * runtime (see `lib/branches.ts` for the parsing and the ORDER-IS-LOAD-BEARING
+ * colour rule, and `lib/branches-server.ts` for the read). Nothing here needs
+ * editing to run the app for a different family.
+ *
+ * The type is deliberately a bare `string`: `family_members.family_branch` is a
+ * plain TEXT column with no constraint, so a database routinely holds values the
+ * current configuration doesn't list — rows written before the list changed, or
+ * by another deployment. Nothing in the app may narrow on the value; unknown
+ * ones fall through to the neutral / catch-all treatment.
  */
-export type FamilyBranch = 'Levi' | 'Cohen' | 'Mizrahi' | 'Adler' | 'Other';
-
-export const FAMILY_BRANCHES: FamilyBranch[] = [
-  'Levi',
-  'Cohen',
-  'Mizrahi',
-  'Adler',
-  'Other',
-];
+export type FamilyBranch = string;
 
 export const HEBREW_MONTHS = [
   'Tishrei',

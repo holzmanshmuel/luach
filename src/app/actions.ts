@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { query, withTransaction } from '@/lib/db';
 import { requireAuth, requireEditor, requireDeleter } from '@/lib/auth';
-import { HEBREW_MONTHS, EventType, FamilyMember, Gathering, GatheringKind, GATHERING_KINDS, FAMILY_BRANCHES, FamilyBranch, BranchSpelling } from '@/lib/types';
+import { HEBREW_MONTHS, EventType, FamilyMember, Gathering, GatheringKind, GATHERING_KINDS, BranchSpelling } from '@/lib/types';
+import { namedBranches } from '@/lib/branches';
+import { familyBranches } from '@/lib/branches-server';
 import { getViewerSpelling, rewriteNames } from '@/lib/spellings';
 import { exactGregorianToHebrew } from '@/lib/hebrew';
 import { splitFullName } from '@/lib/names';
@@ -672,7 +674,10 @@ export async function addBranchSpellingAction(
   if (auth) return auth;
   const b = branch.trim();
   const s = spelling.trim().replace(/\s+/g, ' ');
-  if (!FAMILY_BRANCHES.includes(b as FamilyBranch) || b === 'Other') {
+  // Only a NAMED branch can carry alternate spellings — the catch-all (the last
+  // configured branch) has no surname, and an unconfigured value is not ours to
+  // invent spellings for.
+  if (!namedBranches(familyBranches()).includes(b)) {
     return { error: 'Please choose a family branch.' };
   }
   if (!s) return { error: 'Please enter a spelling.' };

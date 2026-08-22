@@ -85,12 +85,35 @@ Set these variables on the service:
 | `SESSION_PASSWORD` | `openssl rand -hex 32` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From step 3 |
 | `OAUTH_REDIRECT_URI` | `https://<your-domain>/api/auth/google/callback` |
-| `NEXTAUTH_URL` | `https://<your-domain>` |
+| `NEXTAUTH_URL` | `https://<your-domain>`. Not optional in practice: the WhatsApp digest and yahrzeit feeds return 500 rather than guess an origin for the links they send |
+| `FAMILY_BRANCHES` | Optional — your family's branch surnames, comma-separated. See below |
 | `N8N_TOKEN` | Optional — bearer token for the automation feeds. See [SETUP-WHATSAPP.md](./SETUP-WHATSAPP.md). **A deployment secret: it reads across families.** |
 | `DIGEST_RECIPIENTS` | Optional — extra comma-separated E.164 numbers for digests |
 
 Photos are stored as base64 data URLs in Postgres, so there is no object store
 or image CDN to configure.
+
+### `FAMILY_BRANCHES` — your family's sides
+
+```
+FAMILY_BRANCHES=Levi,Cohen,Mizrahi,Adler,Other
+```
+
+Unset, you get that fictional demo list. Two things to know before you set it:
+
+- **The last entry is the catch-all.** It means "no particular branch": neutral
+  tint, excluded from the surname-spelling picker, and the bucket the CSV
+  importer uses for anyone it can't place. Name it whatever you like — only its
+  position matters.
+- **Order decides the colours.** Each branch takes the palette colour at its
+  POSITION in this list, so reordering silently reshuffles the colours your
+  family already associates with each side. Append; don't insert or reorder.
+
+Changing the list does not touch the database. People whose stored branch is no
+longer listed keep their value, render in the neutral tint, and filter under the
+catch-all chip in the tree — nothing breaks, they just stop being colour-coded.
+So if you are switching an existing deployment to different branch names, update
+those people's branch in the app (or with SQL) as a separate step.
 
 ## Step 5 — First sign-in
 

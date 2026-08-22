@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect, useRef } from 'react';
-import { FamilyBranch, FAMILY_BRANCHES } from '@/lib/types';
+import { FamilyBranch } from '@/lib/types';
 import {
   updatePersonAction,
   updatePersonPhotoAction,
@@ -55,7 +55,7 @@ interface Props {
 }
 
 export function EditPersonModal({ person, onClose }: Props) {
-  const { t, spell } = useUserPrefs();
+  const { t, spell, branches } = useUserPrefs();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +67,13 @@ export function EditPersonModal({ person, onClose }: Props) {
   const [editNickname, setEditNickname] = useState(person.nickname ?? '');
   const [editMaiden, setEditMaiden] = useState(person.maiden_name ?? '');
   const [editBranch, setEditBranch] = useState(person.family_branch ?? '');
+  // A stored branch the current FAMILY_BRANCHES doesn't list (written before the
+  // list changed, or by another deployment) still gets an option of its own —
+  // otherwise the <select> would render blank and quietly wipe the value on the
+  // next save.
+  const branchOptions = !editBranch || branches.includes(editBranch)
+    ? branches
+    : [...branches, editBranch];
 
   // Photo state: starts as current URL (may be data-url base64 or null)
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(person.photo_url ?? null);
@@ -292,7 +299,7 @@ export function EditPersonModal({ person, onClose }: Props) {
           <label className={fieldLabel}>{t('person.branch')}</label>
           <select aria-label={t('person.branch')} value={editBranch} onChange={e => setEditBranch(e.target.value)} className={fieldInput}>
             <option value="">Select branch…</option>
-            {FAMILY_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+            {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
 

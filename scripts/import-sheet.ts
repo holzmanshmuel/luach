@@ -10,7 +10,8 @@
  *   2. Hebrew Birthday  — "ח' שבט" / "8 Shvat 5745" / blank
  *   3. English Birthday — "February 8, 1961" / blank
  *   4. Anniversary      — Hebrew and/or English, separated by "~" / blank
- *   5. Branch           — OPTIONAL. One of FAMILY_BRANCHES (src/lib/types.ts).
+ *   5. Branch           — OPTIONAL. One of the names in the FAMILY_BRANCHES
+ *                         environment variable (see src/lib/branches.ts).
  *                         Blank → inferred from the surname in column 1.
  *
  * Usage:
@@ -32,7 +33,13 @@ import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
 import { parseHebrewDateString } from '../src/lib/hebrew-parser';
-import { FAMILY_BRANCHES } from '../src/lib/types';
+import { catchAllBranch, namedBranches } from '../src/lib/branches';
+import { familyBranches } from '../src/lib/branches-server';
+
+// The configured branch list (FAMILY_BRANCHES env var; the demo family's when
+// unset). Read once — see src/lib/branches.ts for the ordering rules.
+const BRANCHES = familyBranches();
+const CATCH_ALL = catchAllBranch(BRANCHES) ?? 'Other';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -117,21 +124,20 @@ function parseEnglishDate(raw: string): string | null {
 /**
  * Infer which family branch a person belongs to from the surname in their name.
  *
- * Matches against the branch surnames configured in `src/lib/types.ts`
- * (FAMILY_BRANCHES) — so once you have set those to your own family's branch
- * names, this needs no editing. Anyone whose name matches none of them lands in
- * 'Other', which you can fix in the app afterwards.
+ * Matches against the branch surnames in the `FAMILY_BRANCHES` environment
+ * variable — so once that names your own family's branches, this needs no
+ * editing. Anyone whose name matches none of them lands in the catch-all (the
+ * LAST configured branch), which you can fix in the app afterwards.
  *
  * If your spreadsheet has an explicit branch column instead, pass it as the 5th
  * CSV column and it wins over this inference.
  */
 function inferBranch(name: string): string {
   const n = name.toLowerCase();
-  for (const branch of FAMILY_BRANCHES) {
-    if (branch === 'Other') continue;
+  for (const branch of namedBranches(BRANCHES)) {
     if (n.includes(branch.toLowerCase())) return branch;
   }
-  return 'Other';
+  return CATCH_ALL;
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +208,7 @@ async function main() {
     // An explicit branch column wins; otherwise infer it from the surname.
     const explicit = rawBranch?.trim();
     const branch =
-      explicit && (FAMILY_BRANCHES as string[]).includes(explicit)
+      explicit && BRANCHES.includes(explicit)
         ? explicit
         : inferBranch(name);
 

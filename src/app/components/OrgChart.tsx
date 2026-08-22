@@ -5,6 +5,7 @@ import { hierarchy, tree, HierarchyPointNode } from 'd3-hierarchy';
 import { FamilyTreeNode } from '@/lib/types';
 import { Avatar } from './Avatar';
 import { displayName, maidenName } from '@/lib/names';
+import { branchStyle, branchBucket } from '@/lib/branches';
 import { useUserPrefs } from './UserPrefsContext';
 import { useBranchHighlight } from './FamilyTreeContext';
 import { EditPersonModal } from './EditPersonModal';
@@ -19,15 +20,6 @@ const COUPLE_HALF = (CARD_W + COUPLE_GAP) / 2;
 const H_SLOT = CARD_W + 52;     // d3 horizontal node size
 const ROW_H = CARD_H + 84;      // d3 vertical node size (card + connector room)
 const PAD = 60;                 // canvas padding around the laid-out tree
-
-// On-brand branch accent (matches the legend dots, not the bright fruit-tree hues).
-const BRANCH_ACCENT: Record<string, string> = {
-  Levi:  '#4C4F30',
-  Cohen: '#3C4A3E',
-  Mizrahi:   '#6B4A3E',
-  Adler:     '#6B5A2E',
-  Other:     '#B6BCC6',
-};
 
 type PNode = HierarchyPointNode<FamilyTreeNode>;
 
@@ -79,9 +71,10 @@ function NodeCard({
   onClick: () => void;
   secondary?: boolean;
 }) {
-  const { showNicknames, language } = useUserPrefs();
-  const branch = person.family_branch ?? 'Other';
-  const accent = BRANCH_ACCENT[branch] ?? BRANCH_ACCENT.Other;
+  const { showNicknames, language, branches } = useUserPrefs();
+  // Accent bar by the branch's POSITION in the configured list; an unset,
+  // catch-all or unrecognised branch gets the neutral accent.
+  const accent = branchStyle(branches, person.family_branch).accent;
   const rawName = person.name.replace(/~[^~]+$/, '').replace(/\\/g, '');
   const name = displayName(person, language, showNicknames);
   const maiden = maidenName(person, language);
@@ -205,7 +198,7 @@ type FocusTarget = number | 'root' | 'all' | null;
 // ── Main chart ────────────────────────────────────────────────────────────────
 export function OrgChart({ roots }: { roots: FamilyTreeNode[] }) {
   const highlight = useBranchHighlight();
-  const { t } = useUserPrefs();
+  const { t, branches } = useUserPrefs();
   // Start with everything collapsed — the view opens zoomed in on Grandma, and each
   // expand drills down to the newly revealed person/couple.
   const [collapsed, setCollapsed] = useState<Set<number>>(() => allParentIds(roots));
@@ -307,7 +300,7 @@ export function OrgChart({ roots }: { roots: FamilyTreeNode[] }) {
       arr.push(l.target);
       byParent.set(l.source.data.id, arr);
     }
-    const paths: { key: string; d: string; branch: string }[] = [];
+    const paths: { key: string; d: string; accent: string }[] = [];
     for (const [, children] of byParent) {
       const parent = children[0].parent as PNode;
       const originX = parent.x; // couple midpoint (or single-card center)
@@ -319,12 +312,12 @@ export function OrgChart({ roots }: { roots: FamilyTreeNode[] }) {
         paths.push({
           key: `${parent.data.id}-${c.data.id}`,
           d: roundedElbow([[originX, parentBottom], [originX, busY], [cx, busY], [cx, c.y]]),
-          branch: c.data.family_branch ?? 'Other',
+          accent: branchStyle(branches, c.data.family_branch).accent,
         });
       }
     }
     return paths;
-  }, [links]);
+  }, [links, branches]);
 
   // Apply a pending focus once the new layout reflecting it has been computed.
   // Runs in rAF (after paint) so the d3 transform is set against the final layout.
@@ -439,7 +432,7 @@ export function OrgChart({ roots }: { roots: FamilyTreeNode[] }) {
             {/* Parent → child elbows */}
             {connectors.map(c => (
               <path key={c.key} d={c.d} fill="none"
-                stroke={BRANCH_ACCENT[c.branch] ?? BRANCH_ACCENT.Other}
+                stroke={c.accent}
                 strokeOpacity={0.5} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             ))}
           </svg>
@@ -456,8 +449,10 @@ export function OrgChart({ roots }: { roots: FamilyTreeNode[] }) {
                   <NodeCard key={person.id} person={person} cx={memberCx(n, i)} top={n.y}
                     secondary={i > 0}
                     // Dim by EACH card's own branch — a married-in spouse is usually a
-                    // different branch than the person they married.
-                    dimmed={highlight !== null && (person.family_branch ?? 'Other') !== highlight}
+                    // different branch than the person they married. Unset and
+                    // unrecognised values filter under the catch-all chip, matching
+                    // the neutral colour they are drawn in.
+                    dimmed={highlight !== null && branchBucket(branches, person.family_branch) !== highlight}
                     faded={faded && !matches(person)} onClick={() => setDetail(person)} />
                 ))}
 

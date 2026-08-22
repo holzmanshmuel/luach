@@ -17,6 +17,11 @@
  * have entered your own family — or point this at a throwaway family id and keep
  * it around as a demo.
  *
+ * The branch values here ('Levi', 'Cohen') are the DEFAULT branch list, so run
+ * this with `FAMILY_BRANCHES` unset (or set to the default) if you want the demo
+ * people colour-coded. Under a different list they still seed fine, they just
+ * render in the neutral tint like any other unrecognised branch.
+ *
  * Usage:
  *   DATABASE_URL="postgres://app_user:...@localhost:5432/family_calendar" \
  *     npx tsx scripts/seed-example-family.ts

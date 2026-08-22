@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useTransition, useCallback } from 'react';
-import { CalendarEvent, FAMILY_BRANCHES, EVENT_TYPES, EventType, HEBREW_MONTHS } from '@/lib/types';
+import { CalendarEvent, EVENT_TYPES, EventType, HEBREW_MONTHS } from '@/lib/types';
 import { Modal, fieldLabel, fieldInput, btnPrimary, btnGhost } from './Modal';
 import { useUserPrefs } from './UserPrefsContext';
 import { monthOptionLabel } from '@/lib/date-format';
@@ -31,7 +31,7 @@ const dateCellInput =
   'w-full bg-transparent border-b border-warm-border focus:border-accent py-1.5 text-ink text-sm text-center outline-none transition-colors';
 
 export function AddEditModal({ mode, event, onClose }: Props) {
-  const { t, isAdmin, language } = useUserPrefs();
+  const { t, isAdmin, language, branches } = useUserPrefs();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -314,7 +314,7 @@ export function AddEditModal({ mode, event, onClose }: Props) {
                 <label className={fieldLabel}>{t('person.branch')}</label>
                 <select aria-label={t('person.branch')} value={branch} onChange={e => setBranch(e.target.value)} className={fieldInput}>
                   <option value="">{t('form.select_branch')}</option>
-                  {FAMILY_BRANCHES.map(b => (
+                  {branches.map(b => (
                     <option key={b} value={b}>{b}</option>
                   ))}
                 </select>

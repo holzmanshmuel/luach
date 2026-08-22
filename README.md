@@ -104,8 +104,44 @@ Fill it in — `.env.example` documents each variable:
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | yes | Google OAuth 2.0 "Web application" client |
 | `OAUTH_REDIRECT_URI` | yes | `https://<your-domain>/api/auth/google/callback`, registered identically in the Google console |
 | `NEXTAUTH_URL` | in prod | Your public origin, used to build invite and feed URLs. The WhatsApp broadcast feeds **500 rather than guess** if it is unset — there is no default |
+| `FAMILY_BRANCHES` | optional | Your family's branch surnames, comma-separated — see [Family branches](#family-branches). Unset = the demo family's |
 | `N8N_TOKEN` | optional | Bearer token for the automation feeds — **a deployment secret; it reads across families** |
 | `DIGEST_RECIPIENTS` | optional | Extra comma-separated E.164 numbers for digests |
+
+### Family branches
+
+A "branch" is a side of the family — usually a surname. Luach tints avatars,
+tree cards and timeline entries by branch, and each viewer can pick their
+preferred spelling of each branch surname. Set yours in the environment; no code
+changes:
+
+```bash
+FAMILY_BRANCHES="Levi,Cohen,Mizrahi,Adler,Other"
+```
+
+Leave it unset and you get that fictional demo list.
+
+Two rules:
+
+- **Keep a catch-all LAST.** The final entry is the "no particular branch"
+  bucket. It is drawn in a neutral tint, it is where the CSV importer files
+  anyone whose surname it can't place, and it is left out of the
+  spelling picker (it has no surname to spell). Call it `Other`, `Misc`, `אחר`
+  — whatever you like; only its position matters.
+- **Order is the colour.** Branch colours are assigned by POSITION: the first
+  name gets the first palette colour, the second the second, and so on.
+  Reordering the list therefore reshuffles the colours everyone in your family
+  already recognises — **append, never insert or reorder**. Renaming a branch in
+  place keeps its colour, but does not rewrite the value stored on existing
+  people; edit those in the app (or with SQL) if you want them to move.
+
+You can list more or fewer than five. Beyond the built-in palette (four named
+branches plus the neutral catch-all) colours repeat from the start; add entries
+to `BRANCH_STYLES` in `src/lib/branches.ts` if you'd rather they didn't.
+
+Branch values already in the database that are **not** in your current list
+don't break anything — those people render in the neutral tint, keep their
+stored value, and filter under the catch-all chip in the tree.
 
 ### 3. Run it
 
@@ -152,9 +188,8 @@ that takes a container. Set the same environment variables as secrets, point
 
 A few places carry the reference deployment's identity rather than yours:
 
-- `src/lib/types.ts` — `FAMILY_BRANCHES` holds placeholder branch surnames.
-  Replace them with your family's. It is the one place to edit; the file
-  explains what else to touch if you change how many there are.
+- Branch surnames are the `FAMILY_BRANCHES` environment variable — see
+  [Family branches](#family-branches). No code change needed.
 - `src/app/(marketing)/privacy/page.tsx` and
   `src/app/components/BuiltByHolzman.tsx` — the privacy policy and footer name
   the hosted instance's operator and contact address. If you run your own

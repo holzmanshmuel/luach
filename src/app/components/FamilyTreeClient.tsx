@@ -10,15 +10,8 @@ import { UserPrefsToolbar } from './UserPrefsToolbar';
 import { EditPersonModal } from './EditPersonModal';
 import { useUserPrefs } from './UserPrefsContext';
 import { displayName } from '@/lib/names';
+import { branchStyle, isCatchAllBranch } from '@/lib/branches';
 import Link from 'next/link';
-
-const BRANCH_META: Record<string, { dot: string; label: string }> = {
-  Levi:  { dot: 'bg-[#4C4F30]', label: 'Levi' },
-  Cohen: { dot: 'bg-[#3C4A3E]', label: 'Cohen' },
-  Mizrahi:   { dot: 'bg-[#6B4A3E]', label: 'Mizrahi' },
-  Adler:     { dot: 'bg-[#6B5A2E]', label: 'Adler' },
-  Other:     { dot: 'bg-ink-faint', label: 'Other' },
-};
 
 // ── Editable card for unlinked members ──────────────────────────────────────
 
@@ -62,7 +55,7 @@ export function FamilyTreeClient({
   spellings: BranchSpelling[];
 }) {
   const [highlight, setHighlight] = useState<string | null>(null);
-  const { t, canEdit, spell } = useUserPrefs();
+  const { t, canEdit, spell, branches } = useUserPrefs();
 
   function toggleBranch(branch: string) {
     setHighlight(h => (h === branch ? null : branch));
@@ -97,8 +90,11 @@ export function FamilyTreeClient({
       {/* Legend — clickable branch filters */}
       <div className="max-w-7xl mx-auto px-6 pt-4 pb-2 flex flex-wrap items-center gap-2">
         <span className="text-xs text-ink-faint mr-1">{t('tree.filter')}</span>
-        {Object.entries(BRANCH_META).map(([branch, { dot, label }]) => {
-          const display = branch === 'Other' ? label : spell(branch);
+        {branches.map(branch => {
+          const { dot } = branchStyle(branches, branch);
+          // The catch-all has no surname, so no alternate spellings to apply —
+          // it shows exactly as configured.
+          const display = isCatchAllBranch(branches, branch) ? branch : spell(branch);
           const isActive = highlight === branch;
           const isDimmed = highlight !== null && !isActive;
           return (

@@ -1,20 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { BranchSpelling, FAMILY_BRANCHES } from '@/lib/types';
+import { BranchSpelling } from '@/lib/types';
+import { branchStyle, namedBranches } from '@/lib/branches';
 import { Modal, fieldInput } from './Modal';
 import { useUserPrefs } from './UserPrefsContext';
 import { addBranchSpellingAction, deleteBranchSpellingAction } from '@/app/actions';
-
-const DOT: Record<string, string> = {
-  Levi: 'bg-[#4C4F30]',
-  Cohen: 'bg-[#3C4A3E]',
-  Mizrahi: 'bg-[#6B4A3E]',
-  Adler: 'bg-[#6B5A2E]',
-};
-
-// The named branches — 'Other' has no surname to spell.
-const BRANCHES = FAMILY_BRANCHES.filter(b => b !== 'Other');
 
 interface Option { spelling: string; id: number | null } // id === null → the canonical (not removable)
 
@@ -25,7 +16,10 @@ interface Option { spelling: string; id: number | null } // id === null → the 
  * spelling; only added ones (not the canonical branch value) can be removed.
  */
 export function BranchSpellingsModal({ spellings }: { spellings: BranchSpelling[] }) {
-  const { t, canEdit, isAdmin, chosen, setSpelling } = useUserPrefs();
+  const { t, canEdit, isAdmin, chosen, setSpelling, branches } = useUserPrefs();
+  // The catch-all (last configured branch) names no surname, so there is
+  // nothing to spell — it is deliberately absent from this list.
+  const spellable = namedBranches(branches);
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -74,7 +68,7 @@ export function BranchSpellingsModal({ spellings }: { spellings: BranchSpelling[
           <p className="text-sm text-ink-muted mb-4">{t('spellings.subtitle')}</p>
 
           <div className="space-y-4">
-            {BRANCHES.map(branch => {
+            {spellable.map(branch => {
               const options = optionsFor(branch);
               // Only what the viewer EXPLICITLY picked — absent means "as entered",
               // so nothing is highlighted until they choose.
@@ -82,7 +76,7 @@ export function BranchSpellingsModal({ spellings }: { spellings: BranchSpelling[
               return (
                 <div key={branch} className="rounded-md border border-warm-border bg-parchment p-3">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${DOT[branch]}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full ${branchStyle(branches, branch).dot}`} />
                     <span className="font-medium text-ink">{picked ?? branch}</span>
                     <span className="text-[11px] text-ink-faint">
                       {picked ? t('spellings.your_choice') : t('spellings.as_entered')}

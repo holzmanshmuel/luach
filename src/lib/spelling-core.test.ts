@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { buildVariants, makeViewerSpelling } from './spelling-core';
 
+// The default (fictional) branch list — the fixture keeps using it, but nothing
+// here depends on the NAMES: `buildVariants` only knows that the last entry is
+// the catch-all.
 const BRANCHES = ['Levi', 'Cohen', 'Mizrahi', 'Adler', 'Other'];
 
 describe('buildVariants', () => {
-  it('seeds each named branch with its own value first; skips Other', () => {
+  it('seeds each named branch with its own value first; skips the catch-all', () => {
     const v = buildVariants(BRANCHES, [
       { branch: 'Levi', spelling: 'Levy' },
       { branch: 'Levi', spelling: 'Levine' },
@@ -17,6 +20,20 @@ describe('buildVariants', () => {
   it('does not duplicate the canonical if added as a row', () => {
     const v = buildVariants(BRANCHES, [{ branch: 'Adler', spelling: 'Adler' }]);
     expect(v.Adler).toEqual(['Adler']);
+  });
+
+  it('works off a custom configured list, skipping ITS last entry', () => {
+    const v = buildVariants(['Alpha', 'Beta', 'Elsewhere'], []);
+    expect(Object.keys(v).sort()).toEqual(['Alpha', 'Beta']);
+    expect(v.Alpha).toEqual(['Alpha']);
+    expect(v.Elsewhere).toBeUndefined();
+  });
+
+  it('keeps a stored spelling whose branch is no longer configured', () => {
+    // Someone renamed a branch in FAMILY_BRANCHES; the spellings row survives
+    // rather than silently disappearing from the viewer's options.
+    const v = buildVariants(['Alpha', 'Elsewhere'], [{ branch: 'Retired', spelling: 'Retyred' }]);
+    expect(v.Retired).toEqual(['Retired', 'Retyred']);
   });
 });
 

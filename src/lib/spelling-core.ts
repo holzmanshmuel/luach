@@ -9,6 +9,8 @@
  * names + branch tags render in that spelling.
  */
 
+import { namedBranches } from '@/lib/branches';
+
 export interface ViewerSpelling {
   variants: Record<string, string[]>;
   chosen: Record<string, string>;
@@ -25,16 +27,23 @@ export function isHebrew(s: string): boolean {
 }
 
 /**
- * branch -> accepted spellings, the branch value first. `branches` are the
- * canonical family_branch values (each becomes its own first spelling); `rows`
- * are the added variants from the app.
+ * branch -> accepted spellings, the branch value first. `branches` is the
+ * configured branch list (each becomes its own first spelling); `rows` are the
+ * added variants from the app.
+ *
+ * The LAST configured branch is skipped: by convention that position is the
+ * catch-all ("Other"), which names no surname and so has nothing to spell. See
+ * `lib/branches.ts`.
+ *
+ * A `rows` entry for a branch outside the list is still honoured — a spelling
+ * added before the list changed keeps working rather than vanishing.
  */
 export function buildVariants(
   branches: readonly string[],
   rows: { branch: string; spelling: string }[]
 ): Record<string, string[]> {
   const map: Record<string, string[]> = {};
-  for (const b of branches) if (b !== 'Other') map[b] = [b];
+  for (const b of namedBranches(branches)) map[b] = [b];
   for (const r of rows) {
     (map[r.branch] ??= [r.branch]);
     if (!map[r.branch].includes(r.spelling)) map[r.branch].push(r.spelling);

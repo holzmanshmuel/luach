@@ -2,16 +2,8 @@
 
 import { useState } from 'react';
 import { FamilyBranch } from '@/lib/types';
-
-// Desaturated paper tints — gently distinguish branches without leaving the
-// restrained bone/olive palette (replaces the old bright blue/emerald/violet).
-const BRANCH_COLORS: Record<string, { bg: string; fg: string }> = {
-  Levi:  { bg: 'bg-[#E4E3D2]', fg: 'text-[#4C4F30]' },
-  Cohen: { bg: 'bg-[#DCE3DD]', fg: 'text-[#3C4A3E]' },
-  Mizrahi:   { bg: 'bg-[#E9DBD3]', fg: 'text-[#6B4A3E]' },
-  Adler:     { bg: 'bg-[#ECE3CE]', fg: 'text-[#6B5A2E]' },
-  Other:     { bg: 'bg-parchment-dark', fg: 'text-ink-muted' },
-};
+import { branchStyle } from '@/lib/branches';
+import { useUserPrefs } from './UserPrefsContext';
 
 function initialsFor(name: string): string {
   const cleaned = name.replace(/~[^~]+$/, '').replace(/\\/g, '').trim();
@@ -43,7 +35,10 @@ export function Avatar({
   className?: string;
 }) {
   const dims = sizeMap[size];
-  const palette = BRANCH_COLORS[branch ?? 'Other'] ?? BRANCH_COLORS.Other;
+  // Tint by the branch's POSITION in the configured list — an unset, catch-all
+  // or unrecognised branch resolves to the neutral tint rather than erroring.
+  const { branches } = useUserPrefs();
+  const palette = branchStyle(branches, branch);
   const [imgFailed, setImgFailed] = useState(false);
 
   if (photoUrl && !imgFailed) {

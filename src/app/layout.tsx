@@ -7,6 +7,7 @@ import { ServiceWorkerRegister } from '@/app/components/ServiceWorkerRegister';
 import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { BuiltByHolzman } from '@/app/components/BuiltByHolzman';
 import { establishTenant } from '@/lib/auth';
+import { familyBranches } from '@/lib/branches-server';
 import { getViewerSpelling } from '@/lib/spellings';
 import type { Lang } from '@/lib/translations';
 
@@ -100,6 +101,10 @@ export default async function RootLayout({
           language={lang}
           isAdmin={isAdmin}
           canEdit={canEdit}
+          // Read here, on the server, and handed down as a prop: FAMILY_BRANCHES
+          // is a runtime variable and does not exist in the browser bundle. This
+          // is the single point where the configured list enters the UI.
+          branches={familyBranches()}
           spellings={vs.chosen}
           branchVariants={vs.variants}
         >
