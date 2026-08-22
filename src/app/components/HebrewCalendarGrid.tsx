@@ -82,7 +82,7 @@ export function HebrewCalendarGrid({
               key={idx}
               className={`relative min-h-[68px] sm:min-h-[90px] p-1 sm:p-1.5 border-s border-b border-warm-border/60 ${tinted ? 'bg-accent-soft/40' : ''}`}
             >
-              <span className="ennote absolute end-1.5 top-1.5 text-[9px] text-ink-faint">
+              <span className="ennote absolute start-1.5 top-1.5 text-[9px] text-ink-faint">
                 {g.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </span>
               <div
