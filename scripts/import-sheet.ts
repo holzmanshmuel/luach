@@ -3,7 +3,10 @@
  *
  * Most families already keep their birthdays and yahrzeits in a spreadsheet.
  * This reads that export straight into one family's calendar, parsing the messy
- * hand-written Hebrew dates people actually type ("ח' שבט", "15 Adar II").
+ * hand-written Hebrew dates people actually type ("ח' שבט", "15 Adar II") with
+ * `parse-hebrew-date` — the parser that grew up in this repo, now its own
+ * package. The app-specific glue (month vocabulary, the English date column,
+ * the anniversary split) lives in src/lib/sheet-import.ts, where it is tested.
  *
  * Expected columns (header row is skipped, order matters):
  *   1. Name             — "Miriam Levi"; a "~" splits a married name, e.g. "Dina Cohen~Levi"
@@ -32,7 +35,13 @@
 import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
-import { parseHebrewDateString } from '../src/lib/hebrew-parser';
+import { parseHebrewDateOrThrow } from 'parse-hebrew-date';
+import {
+  parseEnglishDate,
+  splitAnniversaryCell,
+  toAppMonth,
+  UnmappedHebrewMonthError,
+} from '../src/lib/sheet-import';
 import { catchAllBranch, namedBranches } from '../src/lib/branches';
 import { familyBranches } from '../src/lib/branches-server';
 
@@ -104,22 +113,6 @@ function parseCsvLine(line: string): string[] {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Parse an English date string like "February 8, 1961" or "Aug. 3, 1971". */
-function parseEnglishDate(raw: string): string | null {
-  if (!raw || !raw.trim()) return null;
-  // Remove trailing periods in month abbreviations
-  const normalized = raw.replace(/\./g, '').trim();
-  try {
-    const d = new Date(normalized);
-    if (!isNaN(d.getTime())) {
-      return d.toISOString().split('T')[0];
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
 
 /**
  * Infer which family branch a person belongs to from the surname in their name.
@@ -222,17 +215,21 @@ async function main() {
     // Parse birthday
     if (rawHebrewBirthday && rawHebrewBirthday.trim()) {
       try {
-        const parsed = parseHebrewDateString(rawHebrewBirthday);
+        const parsed = parseHebrewDateOrThrow(rawHebrewBirthday);
+        const month = toAppMonth(parsed.month);
         const englishDate = parseEnglishDate(rawEnglishBirthday);
         await client.query(
           `INSERT INTO family_calendar.events
            (family_member_id, event_type, hebrew_day, hebrew_month, hebrew_year, original_english_date, note, family_id)
            VALUES ($1, 'birthday', $2, $3, $4, $5, $6, $7)`,
-          [memberId, parsed.day, parsed.month, parsed.year ?? null, englishDate, parsed.note ?? null, FAMILY_ID]
+          [memberId, parsed.day, month, parsed.year ?? null, englishDate, parsed.note ?? null, FAMILY_ID]
         );
-        console.log(`✓ ${name} — birthday: ${parsed.day} ${parsed.month}`);
+        console.log(`✓ ${name} — birthday: ${parsed.day} ${month}`);
         imported++;
       } catch (err) {
+        // A month with no app form is the dependency drifting, not a bad cell:
+        // it would silently mis-file every row carrying that month, so stop.
+        if (err instanceof UnmappedHebrewMonthError) throw err;
         console.warn(`⚠ ${name} — birthday parse FAILED: "${rawHebrewBirthday}"`);
         if (err instanceof Error) console.warn(`  Error: ${err.message}`);
         warnings++;
@@ -242,35 +239,25 @@ async function main() {
     // Parse anniversary
     // Anniversary column may contain "Hebrew ~ English" or "English ~ Hebrew" format
     if (rawAnniversary && rawAnniversary.trim()) {
-      const annivParts = rawAnniversary.split(/~|\\~/).map(s => s.trim());
-
-      // Try each part as the Hebrew date — some entries have English first (e.g. "January 23 ~ ח' שבט")
-      let hebrewAnniv: string | null = null;
-      let englishAnniv: string | null = null;
-      for (let i = 0; i < annivParts.length; i++) {
-        try {
-          parseHebrewDateString(annivParts[i]); // test parse
-          hebrewAnniv = annivParts[i];
-          englishAnniv = annivParts.find((_, j) => j !== i) ?? null;
-          break;
-        } catch {
-          continue;
-        }
-      }
+      // Some entries put the English date first ("January 23 ~ ח' שבט"), so the
+      // halves are told apart by which one reads as a Hebrew date.
+      const { hebrew: hebrewAnniv, english: englishAnniv } = splitAnniversaryCell(rawAnniversary);
 
       if (hebrewAnniv) {
         try {
-          const parsed = parseHebrewDateString(hebrewAnniv);
-          const englishDate = parseEnglishDate(englishAnniv ?? '');
+          const parsed = parseHebrewDateOrThrow(hebrewAnniv);
+          const month = toAppMonth(parsed.month);
+          const englishDate = parseEnglishDate(englishAnniv);
           await client.query(
             `INSERT INTO family_calendar.events
              (family_member_id, event_type, hebrew_day, hebrew_month, hebrew_year, original_english_date, note, family_id)
              VALUES ($1, 'anniversary', $2, $3, $4, $5, $6, $7)`,
-            [memberId, parsed.day, parsed.month, parsed.year ?? null, englishDate, parsed.note ?? null, FAMILY_ID]
+            [memberId, parsed.day, month, parsed.year ?? null, englishDate, parsed.note ?? null, FAMILY_ID]
           );
-          console.log(`✓ ${name} — anniversary: ${parsed.day} ${parsed.month}`);
+          console.log(`✓ ${name} — anniversary: ${parsed.day} ${month}`);
           imported++;
         } catch (err) {
+          if (err instanceof UnmappedHebrewMonthError) throw err; // see above
           console.warn(`⚠ ${name} — anniversary parse FAILED: "${rawAnniversary}"`);
           if (err instanceof Error) console.warn(`  Error: ${err.message}`);
           warnings++;

@@ -200,7 +200,9 @@ DATABASE_URL="..." npx tsx scripts/import-sheet.ts data.csv --family=<id>
 
 It parses the messy hand-written Hebrew dates people actually type
 (`ח' שבט`, `כ״ט ניסן`, `15 Adar II`) and reports anything it could not read so
-you can add those few by hand.
+you can add those few by hand. The parsing is
+[`parse-hebrew-date`](https://github.com/holzmanshmuel/parse-hebrew-date), the
+parser extracted from this project into its own package.
 
 ### 6. Deploy
 
