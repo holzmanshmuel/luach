@@ -4,6 +4,7 @@ import { EventWithMember, Gathering, gatheringIcon } from '@/lib/types';
 import { getOccurrencesInRange, formatHebrewDate } from '@/lib/hebrew';
 import { solarDateInYear } from '@/lib/solar';
 import { fullName } from '@/lib/names';
+import { getT, Lang } from '@/lib/translations';
 
 /**
  * The occurrence half of a VEVENT UID: a local-time Date as `yyyymmdd`.
@@ -26,6 +27,11 @@ function fmtTimeLabel(t: string): string {
   const ampm = h < 12 ? 'AM' : 'PM';
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+/** Fill `{name}` / `{type}` placeholders in a translated iCal title template. */
+function fill(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, key) => vars[key] ?? whole);
 }
 
 /**
@@ -60,7 +66,8 @@ function fmtTimeLabel(t: string): string {
  * column, not part of the key), so ids are already globally unique. Keeping the
  * family out also means a UID survives a family being renamed or re-keyed.
  */
-export async function generateICalFeed(): Promise<string> {
+export async function generateICalFeed(lang: Lang = 'en'): Promise<string> {
+  const t = getT(lang);
   const rows = await query<EventWithMember>(`
     SELECT e.*, fm.name, fm.last_name, fm.name_he, fm.family_branch
     FROM family_calendar.events e
@@ -88,7 +95,15 @@ export async function generateICalFeed(): Promise<string> {
     );
 
     const icon = row.event_type === 'birthday' ? '🎂' : row.event_type === 'anniversary' ? '💍' : row.event_type === 'yahrtzeit' ? '🕯️' : '📅';
-    const typeLabel = row.event_type === 'birthday' ? 'Birthday' : row.event_type === 'anniversary' ? 'Anniversary' : row.event_type === 'yahrtzeit' ? 'Yahrzeit' : (row.event_type_label ?? 'Event');
+    // A known event_type gets its own whole-title template (Hebrew has no
+    // possessive 's, so the title can't be assembled word by word). Anything else
+    // falls back to the generic template with the row's own free-text label.
+    const titleKey =
+      row.event_type === 'birthday' ? 'ical.title.hebrew.birthday'
+      : row.event_type === 'anniversary' ? 'ical.title.hebrew.anniversary'
+      : row.event_type === 'yahrtzeit' ? 'ical.title.hebrew.yahrtzeit'
+      : 'ical.title.hebrew.other';
+    const typeLabel = row.event_type_label ?? t('ical.type.event');
     const hebrewDate = formatHebrewDate(row.hebrew_day, row.hebrew_month, row.hebrew_year);
 
     // Hebrew calendar occurrences
@@ -97,8 +112,8 @@ export async function generateICalFeed(): Promise<string> {
         uid: `evt-${row.id}-h-${uidDay(date)}@luach`,
         start: [date.getFullYear(), date.getMonth() + 1, date.getDate()],
         duration: { days: 1 },
-        title: `${icon} ${feedName(row)}'s Hebrew ${typeLabel}`,
-        description: `Hebrew Date: ${hebrewDate}${row.note ? ` (${row.note})` : ''}${row.family_branch ? `\nFamily: ${row.family_branch}` : ''}`,
+        title: `${icon} ${fill(t(titleKey), { name: feedName(row), type: typeLabel })}`,
+        description: `${t('ical.desc.hebrew_date')}: ${hebrewDate}${row.note ? ` (${row.note})` : ''}${row.family_branch ? `\n${t('ical.desc.family')}: ${row.family_branch}` : ''}`,
         status: 'CONFIRMED',
         busyStatus: 'FREE',
       });
@@ -117,8 +132,8 @@ export async function generateICalFeed(): Promise<string> {
             uid: `evt-${row.id}-e-${uidDay(date)}@luach`,
             start: [date.getFullYear(), date.getMonth() + 1, date.getDate()],
             duration: { days: 1 },
-            title: `📅 ${feedName(row)}'s English Birthday`,
-            description: `English Calendar Birthday (same date every year)${row.note ? ` — ${row.note}` : ''}${row.family_branch ? `\nFamily: ${row.family_branch}` : ''}\nHebrew date: ${hebrewDate}`,
+            title: `📅 ${fill(t('ical.title.english_birthday'), { name: feedName(row) })}`,
+            description: `${t('ical.desc.english_birthday')}${row.note ? ` — ${row.note}` : ''}${row.family_branch ? `\n${t('ical.desc.family')}: ${row.family_branch}` : ''}\n${t('ical.desc.hebrew_date')}: ${hebrewDate}`,
             status: 'CONFIRMED',
             busyStatus: 'FREE',
           });
@@ -143,8 +158,8 @@ export async function generateICalFeed(): Promise<string> {
     // server vs a local dev box). All-day keeps the date stable everywhere.
     const timeLabel = g.gather_time ? fmtTimeLabel(g.gather_time) : '';
     const descParts = [
-      g.gather_time ? `Time: ${timeLabel}` : '',
-      g.location ? `Where: ${g.location}` : '',
+      g.gather_time ? `${t('ical.desc.time')}: ${timeLabel}` : '',
+      g.location ? `${t('ical.desc.where')}: ${g.location}` : '',
       g.description ?? '',
     ].filter(Boolean);
     const base: EventAttributes = {

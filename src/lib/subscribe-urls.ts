@@ -2,6 +2,7 @@ import { getSession } from '@/lib/auth';
 import { getMembership } from '@/lib/users';
 import { publicOrigin } from '@/lib/base-url';
 import { feedTokenForFamily } from '@/lib/feed-token';
+import { cookies } from 'next/headers';
 
 export interface SubscribeUrls {
   httpsUrl: string;
@@ -29,6 +30,10 @@ export interface SubscribeUrls {
  *    establishTenant()/requireAuth() and the /api/family/switch route.
  *  - **No `family=` in the URL.** The token identifies its family (migrate-v13);
  *    /api/calendar.ics ignores any family param.
+ *  - **`lang=he` is baked in for Hebrew users.** Calendar apps don't send
+ *    cookies, so the feed can't read the `lang` cookie the way the rest of the
+ *    app does — the language has to travel in the URL itself. English is the
+ *    default and is left implicit, so existing subscriptions are byte-identical.
  */
 export async function subscribeUrlsForSession(request: Request): Promise<SubscribeUrls | null> {
   const session = await getSession();
@@ -40,7 +45,11 @@ export async function subscribeUrlsForSession(request: Request): Promise<Subscri
   const feedToken = await feedTokenForFamily(session.familyId);
   if (!feedToken) return null;
 
+  const cookieStore = await cookies();
+  const langSuffix = cookieStore.get('lang')?.value === 'he' ? '&lang=he' : '';
+
   const httpsUrl =
-    publicOrigin(request) + `/api/calendar.ics?token=${encodeURIComponent(feedToken)}`;
+    publicOrigin(request) +
+    `/api/calendar.ics?token=${encodeURIComponent(feedToken)}${langSuffix}`;
   return { httpsUrl, webcalUrl: httpsUrl.replace(/^https?:/, 'webcal:') };
 }
