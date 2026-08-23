@@ -23,7 +23,7 @@
     "ics": "^3.11.0",
     "iron-session": "^8.0.4",
     "next": "16.2.4",
-    "parse-hebrew-date": "^0.1.0",
+    "parse-hebrew-date": "^0.2.0",
     "pg": "^8.20.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
