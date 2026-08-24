@@ -2,7 +2,24 @@ import { getSession } from '@/lib/auth';
 import { getMembership } from '@/lib/users';
 import { publicOrigin } from '@/lib/base-url';
 import { feedTokenForFamily } from '@/lib/feed-token';
-import { cookies } from 'next/headers';
+
+/**
+ * Read one cookie off the Request itself, rather than via next/headers'
+ * `cookies()`. Same reason `publicOrigin()` takes the request: this function is
+ * called straight from route handlers in tests, where there is no request-scoped
+ * cookie store and `cookies()` throws. `getSession()` gets away with `cookies()`
+ * only because the tests mock it wholesale.
+ */
+function cookieFromRequest(request: Request, name: string): string | null {
+  const header = request.headers.get('cookie');
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return null;
+}
 
 export interface SubscribeUrls {
   httpsUrl: string;
@@ -45,8 +62,7 @@ export async function subscribeUrlsForSession(request: Request): Promise<Subscri
   const feedToken = await feedTokenForFamily(session.familyId);
   if (!feedToken) return null;
 
-  const cookieStore = await cookies();
-  const langSuffix = cookieStore.get('lang')?.value === 'he' ? '&lang=he' : '';
+  const langSuffix = cookieFromRequest(request, 'lang') === 'he' ? '&lang=he' : '';
 
   const httpsUrl =
     publicOrigin(request) +
