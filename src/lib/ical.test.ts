@@ -139,3 +139,43 @@ describe('generateICalFeed — stable VEVENT UIDs', () => {
     expect(after).toEqual(before);
   });
 });
+
+/**
+ * Feed language (HOLZMAN-63). The feed is the one surface that cannot read the
+ * `lang` cookie — calendar apps send no cookies — so the language is passed in
+ * explicitly. Two things are worth pinning:
+ *
+ *  1. Hebrew really renders. The title templates are whole strings per event
+ *     type (Hebrew takes no possessive 's), and `getT()` silently falls back to
+ *     English for a missing key — so a broken template degrades to English
+ *     rather than failing, which is exactly the kind of bug a test has to catch.
+ *  2. UIDs do NOT change with language. Subscribers who switch must see their
+ *     existing entries UPDATE, not a duplicate calendar.
+ */
+describe('feed language (HOLZMAN-63)', () => {
+  // ics folds long lines with CRLF + a leading space; Hebrew is multibyte, so a
+  // summary can be split mid-word. Unfold before matching on content.
+  const unfold = (feed: string) => feed.replace(/\r?\n[ \t]/g, '');
+
+  it('renders Hebrew titles for he, English for the default', async () => {
+    const en = unfold(await runWithTenant(familyId, () => generateICalFeed()));
+    const he = unfold(await runWithTenant(familyId, () => generateICalFeed('he')));
+
+    expect(en).toContain("'s Hebrew Birthday");
+    expect(he).toContain('יום הולדת עברי של');
+
+    // the person's name still reaches the Hebrew title
+    expect(he).toContain(PERSON);
+    // and no English boilerplate leaked through a fallback
+    expect(he).not.toContain('Hebrew Birthday');
+    expect(he).not.toContain('English Birthday');
+  });
+
+  it('keeps VEVENT UIDs identical across languages, so a switch updates in place', async () => {
+    const en = await runWithTenant(familyId, () => generateICalFeed());
+    const he = await runWithTenant(familyId, () => generateICalFeed('he'));
+
+    expect(uidsOf(he)).toEqual(uidsOf(en));
+    expect(veventCount(he)).toBe(veventCount(en));
+  });
+});
