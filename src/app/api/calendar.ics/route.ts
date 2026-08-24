@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateICalFeed } from '@/lib/ical';
+import { Lang } from '@/lib/translations';
 import { familyIdForFeedToken } from '@/lib/feed-token';
 import { runWithTenant } from '@/lib/tenant';
 
@@ -17,9 +18,22 @@ import { runWithTenant } from '@/lib/tenant';
  * inbound URL is simply ignored (old subscriptions keep working, minus the
  * cross-tenant read). The legacy master token grants nothing — ICAL_TOKEN is no
  * longer read anywhere in the app.
+ *
+ * ## Language
+ *
+ * `?lang=he` renders the feed in Hebrew; anything else (including absent) is
+ * English. It has to be a query parameter: calendar apps don't send cookies, so
+ * the `lang` cookie the rest of the app localizes from cannot reach this route.
+ * The subscribe URL handed to a user already carries their current language, so
+ * this is normally invisible.
+ *
+ * Language is deliberately NOT part of the VEVENT UID (those are row id + day,
+ * see src/lib/ical.ts). Re-subscribing in the other language therefore updates
+ * the existing entries in place rather than duplicating the whole calendar.
  */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token') ?? '';
+  const lang: Lang = request.nextUrl.searchParams.get('lang') === 'he' ? 'he' : 'en';
   const familyId = await familyIdForFeedToken(token);
   // Fail CLOSED, and identically for "no token" and "unknown token" — a distinct
   // status would let a caller probe which tokens (or families) exist.
@@ -28,7 +42,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const icalString = await runWithTenant(familyId, () => generateICalFeed());
+    const icalString = await runWithTenant(familyId, () => generateICalFeed(lang));
     return new NextResponse(icalString, {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',

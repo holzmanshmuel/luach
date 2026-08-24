@@ -84,8 +84,8 @@ afterEach(() => {
   mockedGetSession.mockReset();
 });
 
-function req(path: string): Request {
-  return new Request(`${ORIGIN}${path}`);
+function req(path: string, cookie?: string): Request {
+  return new Request(`${ORIGIN}${path}`, cookie ? { headers: { cookie } } : undefined);
 }
 
 describe('GET /api/subscribe', () => {
@@ -169,5 +169,43 @@ describe('GET /api/subscribe/info', () => {
     setSession({ userId: strangerId, familyId: familyB });
     const res = await infoGET(req('/api/subscribe/info'));
     expect(res.status).toBe(401);
+  });
+});
+
+/**
+ * The feed is the one surface that cannot read the `lang` cookie itself —
+ * calendar apps send no cookies — so the language has to be baked into the
+ * subscribe URL at hand-out time (HOLZMAN-63).
+ *
+ * English stays implicit so that every URL issued before this existed is still
+ * byte-identical; only Hebrew adds a parameter.
+ */
+describe('feed language in the subscribe URL', () => {
+  it('adds &lang=he for a Hebrew user', async () => {
+    setSession({ userId, familyId: familyA });
+    const res = await infoGET(req('/api/subscribe/info', 'lang=he'));
+    const body = (await res.json()) as { httpsUrl: string; webcalUrl: string };
+    expect(body.httpsUrl).toBe(
+      `${ORIGIN}/api/calendar.ics?token=${encodeURIComponent(tokenA)}&lang=he`
+    );
+    expect(body.webcalUrl).toContain('&lang=he');
+  });
+
+  it('leaves English implicit, so existing URLs are unchanged', async () => {
+    setSession({ userId, familyId: familyA });
+    for (const cookie of [undefined, 'lang=en', 'theme=dark; lang=en']) {
+      const res = await infoGET(req('/api/subscribe/info', cookie));
+      const body = (await res.json()) as { httpsUrl: string };
+      expect(body.httpsUrl, `cookie: ${cookie}`).not.toContain('lang=');
+    }
+  });
+
+  it('finds lang among other cookies, and is not fooled by a lookalike name', async () => {
+    setSession({ userId, familyId: familyA });
+    const hit = await infoGET(req('/api/subscribe/info', 'theme=dark; lang=he; tz=Asia/Jerusalem'));
+    expect(((await hit.json()) as { httpsUrl: string }).httpsUrl).toContain('&lang=he');
+
+    const miss = await infoGET(req('/api/subscribe/info', 'sublang=he; mylang=he'));
+    expect(((await miss.json()) as { httpsUrl: string }).httpsUrl).not.toContain('lang=');
   });
 });

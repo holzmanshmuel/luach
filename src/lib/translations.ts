@@ -1,6 +1,6 @@
 export type Lang = 'en' | 'he';
 
-const T: Record<Lang, Record<string, string>> = {
+export const T: Record<Lang, Record<string, string>> = {
   en: {
     // Navigation
     'nav.calendar': 'Calendar',
@@ -342,6 +342,21 @@ const T: Record<Lang, Record<string, string>> = {
     'landing.invite': 'Have an invite link? Just open it.',
     'landing.source': 'Luach is open source — run it on your own server.',
     'landing.source_link': 'View the code on GitHub',
+
+    // iCal feed (subscribable calendar). Whole titles are templated rather than
+    // assembled from words: Hebrew takes no possessive 's, so "{name}'s Hebrew
+    // Birthday" has no word-by-word Hebrew equivalent.
+    'ical.title.hebrew.birthday': "{name}'s Hebrew Birthday",
+    'ical.title.hebrew.anniversary': "{name}'s Hebrew Anniversary",
+    'ical.title.hebrew.yahrtzeit': "{name}'s Yahrzeit",
+    'ical.title.hebrew.other': "{name}'s Hebrew {type}",
+    'ical.title.english_birthday': "{name}'s English Birthday",
+    'ical.type.event': 'Event',
+    'ical.desc.hebrew_date': 'Hebrew Date',
+    'ical.desc.family': 'Family',
+    'ical.desc.english_birthday': 'English Calendar Birthday (same date every year)',
+    'ical.desc.time': 'Time',
+    'ical.desc.where': 'Where',
   },
   he: {
     // Navigation
@@ -518,7 +533,7 @@ const T: Record<Lang, Record<string, string>> = {
     'onboarding.welcome': 'ברוכים הבאים! 🎉',
     'onboarding.subtitle': 'בואו נגדיר את יומן המשפחה שלכם.',
     'onboarding.name_label': 'שם המשפחה',
-    'onboarding.name_placeholder': 'The Levy Family',
+    'onboarding.name_placeholder': 'משפחת לוי',
     'onboarding.name_he_label': 'שם בעברית (רשות)',
     'onboarding.name_he_placeholder': 'משפחת לוי',
     'onboarding.create': 'יצירת יומן',
@@ -680,6 +695,20 @@ const T: Record<Lang, Record<string, string>> = {
     'landing.invite': 'קיבלתם קישור הזמנה? פשוט פתחו אותו.',
     'landing.source': 'לוּחַ הוא קוד פתוח — אפשר להריץ אותו על שרת משלכם.',
     'landing.source_link': 'לצפייה בקוד ב‑GitHub',
+
+    // iCal feed (subscribable calendar) — see the English note above on why whole
+    // titles are templated.
+    'ical.title.hebrew.birthday': 'יום הולדת עברי של {name}',
+    'ical.title.hebrew.anniversary': 'יום נישואין עברי של {name}',
+    'ical.title.hebrew.yahrtzeit': 'יארצייט של {name}',
+    'ical.title.hebrew.other': '{type} עברי של {name}',
+    'ical.title.english_birthday': 'יום הולדת לועזי של {name}',
+    'ical.type.event': 'אירוע',
+    'ical.desc.hebrew_date': 'תאריך עברי',
+    'ical.desc.family': 'משפחה',
+    'ical.desc.english_birthday': 'יום הולדת בלוח הלועזי (אותו תאריך בכל שנה)',
+    'ical.desc.time': 'שעה',
+    'ical.desc.where': 'מיקום',
   },
 };
 
