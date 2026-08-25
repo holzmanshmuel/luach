@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored by `graft init` — CommonJS shims we do not own or edit, and
+    // regenerated on every graft upgrade, so linting them is noise we cannot fix.
+    ".claude/**",
   ]),
 ]);
 

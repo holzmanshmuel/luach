@@ -45,5 +45,17 @@ next-env.d.ts
 /data.csv
 *.csv
 
-# Local agent worktrees / scratch
-.claude/
+# Local agent worktrees / scratch — everything except the graft wiring below,
+# which is committed so a clone gets the hooks/skill and just runs `graft build`.
+.claude/*
+!.claude/settings.json
+!.claude/helpers/
+!.claude/skills/
+.claude/helpers/*
+!.claude/helpers/graft-hooks.cjs
+!.claude/helpers/graft-statusline.cjs
+.claude/skills/*
+!.claude/skills/graft/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
