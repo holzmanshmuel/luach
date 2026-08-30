@@ -81,12 +81,24 @@ export default async function WelcomePage() {
             <a href="/api/auth/google" className={`${ctaButton} px-7 py-3 text-base`}>
               {t('landing.cta')}
             </a>
+            {/* The way back in for someone who already has a family. This
+                link used to carry the invite-link hint, which left the page with
+                no visible sign-in affordance at all — its only other link told
+                returning members to go find an invite link instead. Points at the
+                OAuth entry route rather than /login: the callback already routes
+                by membership (existing family → /, none → /onboarding), so the
+                interstitial only cost a click. HOLZMAN-152.
+
+                No .ennote here (or on the hint below) — that class forces
+                direction:ltr + mono for Latin fragments, and these strings are
+                translated, so in Hebrew it rendered the copy LTR in monospace. */}
             <a
-              href="/login"
-              className="ennote text-sm text-ink-muted hover:text-ink transition-colors"
+              href="/api/auth/google"
+              className="text-sm text-ink-2 underline underline-offset-4 decoration-1 hover:text-ink transition-colors"
             >
-              {t('landing.invite')}
+              {t('landing.signin')}
             </a>
+            <p className="text-xs text-ink-muted">{t('landing.invite')}</p>
           </div>
         </section>
 
