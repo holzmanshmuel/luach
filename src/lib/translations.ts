@@ -340,6 +340,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'landing.how.step3': 'Everyone sees it in their language',
     'landing.cta': 'Start your family’s calendar',
     'landing.invite': 'Have an invite link? Just open it.',
+    'landing.signin': 'Already have a calendar? Sign in',
     'landing.source': 'Luach is open source — run it on your own server.',
     'landing.source_link': 'View the code on GitHub',
 
@@ -693,6 +694,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'landing.how.step3': 'כל אחד רואה אותו בשפה שלו',
     'landing.cta': 'התחילו את לוח המשפחה שלכם',
     'landing.invite': 'קיבלתם קישור הזמנה? פשוט פתחו אותו.',
+    'landing.signin': 'כבר יש לכם לוח משפחתי? התחברו',
     'landing.source': 'לוּחַ הוא קוד פתוח — אפשר להריץ אותו על שרת משלכם.',
     'landing.source_link': 'לצפייה בקוד ב‑GitHub',
 
