@@ -13,7 +13,22 @@ interface OnboardingLabels {
   creating: string;
 }
 
-export function OnboardingForm({ labels }: { labels: OnboardingLabels }) {
+/**
+ * The name-your-family form. Used by first-run /onboarding AND by /families/new
+ * ("start another calendar") — both call the same createFamilyAction, which never
+ * cared how many families the user already had.
+ *
+ * `autoFocusName` defaults to true, but /onboarding passes false: on that page the
+ * "were you invited?" question sits ABOVE this form, and stealing focus down into the
+ * create field would pull the reader past the question that reroutes them.
+ */
+export function OnboardingForm({
+  labels,
+  autoFocusName = true,
+}: {
+  labels: OnboardingLabels;
+  autoFocusName?: boolean;
+}) {
   const [state, formAction, isPending] = useActionState(
     async (_prev: { error?: string } | null, formData: FormData) => {
       return createFamilyAction({
@@ -36,7 +51,7 @@ export function OnboardingForm({ labels }: { labels: OnboardingLabels }) {
           name="name"
           required
           maxLength={80}
-          autoFocus
+          autoFocus={autoFocusName}
           autoComplete="off"
           className={fieldInput}
           placeholder={labels.namePlaceholder}

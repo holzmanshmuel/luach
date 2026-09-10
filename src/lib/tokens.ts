@@ -193,6 +193,64 @@ export async function createInviteToken(
   return token;
 }
 
+/** Why an invite link cannot be used — or 'live' when it can. */
+export type InviteStatus = 'live' | 'expired' | 'revoked' | 'unknown';
+
+export interface InvitePeek {
+  status: InviteStatus;
+  /** Present for every status EXCEPT 'unknown' — see peekInvite. */
+  familyId?: number;
+  familyName?: string;
+  familyNameHe?: string | null;
+  role?: InviteRole;
+}
+
+/**
+ * Look an invite link up WITHOUT redeeming it, so /join/<token> can name the
+ * family before it asks anyone to sign in.
+ *
+ * Strictly read-only, and deliberately does not stamp `last_used_at`: this runs on
+ * every render of the landing page, including a link-preview fetch from WhatsApp,
+ * and marking those as "used" would show the owner activity that never happened.
+ * Redemption stays in redeemInvite(), called from a POSTed server action.
+ *
+ * CROSS-TENANT read by design, exactly like redeemInvite: the visitor has no
+ * active family, so there is no tenant GUC to scope access_tokens by, and the
+ * app's DB role is not BYPASSRLS. The privileged work is encapsulated in the
+ * SECURITY DEFINER function family_calendar.peek_invite (migrate-v15.sql) rather
+ * than granting the app ambient RLS-bypass; systemQuery here just calls it.
+ *
+ * An expired or revoked link still returns its family — the token is 256-bit, so
+ * whoever holds one was given it, and naming the family is what lets the page say
+ * "ask whoever sent you the <family> link for a new one". A token that does not
+ * exist (garbage, mistyped, or a shared/personal card link) returns
+ * `{ status: 'unknown' }` with nothing else, and the caller falls back to the
+ * intentionally opaque /join-invalid page.
+ */
+export async function peekInvite(rawToken: string): Promise<InvitePeek> {
+  const hash = hashToken(rawToken);
+  const rows = await systemQuery<{
+    out_family_id: number;
+    out_family_name: string;
+    out_family_name_he: string | null;
+    out_role: InviteRole;
+    out_status: 'live' | 'expired' | 'revoked';
+  }>(
+    `SELECT out_family_id, out_family_name, out_family_name_he, out_role, out_status
+       FROM family_calendar.peek_invite($1)`,
+    [hash]
+  );
+  const row = rows[0];
+  if (!row) return { status: 'unknown' };
+  return {
+    status: row.out_status,
+    familyId: row.out_family_id,
+    familyName: row.out_family_name,
+    familyNameHe: row.out_family_name_he,
+    role: row.out_role,
+  };
+}
+
 /**
  * Redeem an invite link for a signed-in user, joining them to the invite's family.
  *

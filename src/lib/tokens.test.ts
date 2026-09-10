@@ -1,15 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { systemQuery, query } from '@/lib/db';
 import { runWithTenant } from '@/lib/tenant';
-import { createInviteToken, redeemInvite, hashToken } from '@/lib/tokens';
+import { createInviteToken, redeemInvite, peekInvite, hashToken } from '@/lib/tokens';
 import { upsertUser } from '@/lib/users';
 
 // access_tokens is an RLS table and the app's DB role is NOT bypass-RLS, so any
 // SELECT on it must run under tenant scope (runWithTenant + query). systemQuery is
 // only for the non-RLS tables (families, users, memberships).
 
-// Requires DATABASE_URL pointing at staging Postgres with migration v11 applied
-// (access_tokens.invite_role + 'invite' kind). Run as app_user so RLS is live.
+// Requires DATABASE_URL pointing at staging Postgres with migrations v11 (invite
+// tokens + redeem_invite) and v15 (peek_invite) applied. Run as app_user so RLS is
+// live — and note that both SECURITY DEFINER functions must be GRANTed to whichever
+// role the suite connects as, or these fail with "permission denied for function".
 
 /** Make a throwaway family and return its id (system-scoped: families is non-RLS). */
 async function makeFamily(name: string): Promise<number> {
@@ -221,6 +223,32 @@ describe('redeemInvite', () => {
     }
   });
 
+  it('an owner who re-redeems keeps owner across BOTH calls', async () => {
+    // The live-bug shape: owners click their own invite link to check that it works,
+    // and some click it twice. Every call must hand back 'owner', because the caller
+    // writes the returned role into the session and proxy.ts gates /admin/* on it.
+    const familyId = await makeFamily('Redeem Owner Twice Family');
+    const userId = await makeUser('ownertwice');
+    try {
+      await systemQuery(
+        "INSERT INTO family_calendar.memberships (user_id, family_id, role) VALUES ($1, $2, 'owner')",
+        [userId, familyId]
+      );
+      const raw = await runWithTenant(familyId, () => createInviteToken('viewer', null));
+
+      expect(await redeemInvite(raw, userId)).toEqual({ familyId, role: 'owner' });
+      expect(await redeemInvite(raw, userId)).toEqual({ familyId, role: 'owner' });
+
+      const [m] = await systemQuery<{ role: string }>(
+        'SELECT role FROM family_calendar.memberships WHERE user_id = $1 AND family_id = $2',
+        [userId, familyId]
+      );
+      expect(m.role).toBe('owner');
+    } finally {
+      await cleanup({ familyIds: [familyId], userIds: [userId] });
+    }
+  });
+
   it('rejects a non-invite (shared/personal) token used as an invite', async () => {
     const familyId = await makeFamily('Redeem WrongKind Family');
     const userId = await makeUser('wrongkind');
@@ -245,6 +273,172 @@ describe('redeemInvite', () => {
       expect(memberships).toHaveLength(0);
     } finally {
       await cleanup({ familyIds: [familyId], userIds: [userId] });
+    }
+  });
+});
+
+/**
+ * peekInvite is what lets /join/<token> name the family BEFORE anyone signs in, and
+ * it runs on every render of that page — including a WhatsApp link-preview fetch. So
+ * the two things worth pinning are that it distinguishes all four outcomes, and that
+ * it writes absolutely nothing.
+ */
+describe('peekInvite', () => {
+  it('returns the family, the role and live status for a usable invite', async () => {
+    const familyId = await makeFamily('Peek Live Family');
+    try {
+      const raw = await runWithTenant(familyId, () => createInviteToken('editor', 'cousins'));
+
+      const peek = await peekInvite(raw);
+      expect(peek).toEqual({
+        status: 'live',
+        familyId,
+        familyName: 'Peek Live Family',
+        familyNameHe: null,
+        role: 'editor',
+      });
+    } finally {
+      await cleanup({ familyIds: [familyId] });
+    }
+  });
+
+  it('returns the Hebrew family name when the family has one', async () => {
+    // The invite landing page shows the Hebrew name to a Hebrew reader, so the peek
+    // has to carry both — the visitor has no tenant and cannot look the family up.
+    const [row] = await systemQuery<{ id: number }>(
+      "INSERT INTO family_calendar.families (name, name_he) VALUES ('Peek Bilingual Family', 'משפחת דוגמה') RETURNING id"
+    );
+    const familyId = row.id;
+    try {
+      const raw = await runWithTenant(familyId, () => createInviteToken('viewer', null));
+      const peek = await peekInvite(raw);
+      expect(peek.familyName).toBe('Peek Bilingual Family');
+      expect(peek.familyNameHe).toBe('משפחת דוגמה');
+    } finally {
+      await cleanup({ familyIds: [familyId] });
+    }
+  });
+
+  it('reports an EXPIRED invite as expired, and still names the family', async () => {
+    // Naming the family on a dead link is the deliberate call that turns a dead end
+    // into "ask whoever sent you the <family> link for a new one". The token is
+    // 256-bit, so whoever presents one was handed it.
+    const familyId = await makeFamily('Peek Expired Family');
+    try {
+      const raw = await runWithTenant(familyId, () => createInviteToken('viewer', null));
+      await runWithTenant(familyId, () =>
+        query(
+          "UPDATE family_calendar.access_tokens SET expires_at = NOW() - INTERVAL '1 day' WHERE token_hash = $1",
+          [hashToken(raw)]
+        )
+      );
+
+      const peek = await peekInvite(raw);
+      expect(peek.status).toBe('expired');
+      expect(peek.familyId).toBe(familyId);
+      expect(peek.familyName).toBe('Peek Expired Family');
+    } finally {
+      await cleanup({ familyIds: [familyId] });
+    }
+  });
+
+  it('reports a REVOKED invite as revoked, separately from expired', async () => {
+    const familyId = await makeFamily('Peek Revoked Family');
+    try {
+      const raw = await runWithTenant(familyId, () => createInviteToken('viewer', null));
+      await runWithTenant(familyId, () =>
+        query(
+          'UPDATE family_calendar.access_tokens SET revoked_at = NOW() WHERE token_hash = $1',
+          [hashToken(raw)]
+        )
+      );
+
+      const peek = await peekInvite(raw);
+      expect(peek.status).toBe('revoked');
+      expect(peek.familyName).toBe('Peek Revoked Family');
+    } finally {
+      await cleanup({ familyIds: [familyId] });
+    }
+  });
+
+  it('reports revoked ahead of expired when a link is both', async () => {
+    // An owner who turned a link off should be told it was turned off, not that it
+    // aged out — the two have different answers.
+    const familyId = await makeFamily('Peek Both Family');
+    try {
+      const raw = await runWithTenant(familyId, () => createInviteToken('viewer', null));
+      await runWithTenant(familyId, () =>
+        query(
+          "UPDATE family_calendar.access_tokens SET revoked_at = NOW(), expires_at = NOW() - INTERVAL '1 day' WHERE token_hash = $1",
+          [hashToken(raw)]
+        )
+      );
+      expect((await peekInvite(raw)).status).toBe('revoked');
+    } finally {
+      await cleanup({ familyIds: [familyId] });
+    }
+  });
+
+  it('returns unknown — and NOTHING else — for a garbage token', async () => {
+    // No family name, no role, no reason. This is the case that keeps /join-invalid
+    // opaque; leaking anything here would make the page an oracle.
+    expect(await peekInvite('not-a-real-token-at-all')).toEqual({ status: 'unknown' });
+  });
+
+  it('returns unknown for a shared/personal card token used as an invite', async () => {
+    const familyId = await makeFamily('Peek WrongKind Family');
+    try {
+      const rawShared = 'shared-raw-token-' + Math.random().toString(36).slice(2);
+      await runWithTenant(familyId, () =>
+        query(
+          "INSERT INTO family_calendar.access_tokens (token_hash, kind) VALUES ($1, 'shared')",
+          [hashToken(rawShared)]
+        )
+      );
+      expect(await peekInvite(rawShared)).toEqual({ status: 'unknown' });
+    } finally {
+      await cleanup({ familyIds: [familyId] });
+    }
+  });
+
+  it('does NOT stamp last_used_at — a link preview must not mark an invite as used', async () => {
+    // WhatsApp and Telegram fetch shared URLs to build a preview, and this page also
+    // re-renders on every refresh. If the peek stamped usage, the owner's admin panel
+    // would report activity that never happened.
+    const familyId = await makeFamily('Peek NoStamp Family');
+    try {
+      const raw = await runWithTenant(familyId, () => createInviteToken('viewer', null));
+
+      await peekInvite(raw);
+      await peekInvite(raw);
+
+      const [tok] = await runWithTenant(familyId, () =>
+        query<{ last_used_at: string | null }>(
+          'SELECT last_used_at FROM family_calendar.access_tokens WHERE token_hash = $1',
+          [hashToken(raw)]
+        )
+      );
+      expect(tok.last_used_at).toBeNull();
+    } finally {
+      await cleanup({ familyIds: [familyId] });
+    }
+  });
+
+  it('creates no membership, ever', async () => {
+    // It is the READ-ONLY companion to redeemInvite. If a render could join somebody,
+    // the whole point of moving redemption off a GET would be lost.
+    const familyId = await makeFamily('Peek NoJoin Family');
+    try {
+      const raw = await runWithTenant(familyId, () => createInviteToken('editor', null));
+      await peekInvite(raw);
+
+      const memberships = await systemQuery(
+        'SELECT 1 FROM family_calendar.memberships WHERE family_id = $1',
+        [familyId]
+      );
+      expect(memberships).toHaveLength(0);
+    } finally {
+      await cleanup({ familyIds: [familyId] });
     }
   });
 });

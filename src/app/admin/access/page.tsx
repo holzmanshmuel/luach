@@ -51,7 +51,11 @@ export default async function AccessAdminPage() {
             {t('invite.page_title')}
           </h1>
         </div>
-        <Link href="/" className="text-xs text-ink-muted hover:text-ink">
+        {/* The arrow lives in JSX and is chosen from `dir`, not baked into the
+            translated label: 'invite.back' used to ship a literal '← ' that pointed
+            the wrong way on the Hebrew page. */}
+        <Link href="/" className="text-xs text-ink-muted hover:text-ink flex items-center gap-1">
+          <span aria-hidden>{dir === 'rtl' ? '→' : '←'}</span>
           {t('invite.back')}
         </Link>
       </header>

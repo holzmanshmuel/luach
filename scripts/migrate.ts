@@ -86,6 +86,7 @@ privileges (run as the owner, once):
     ON ALL TABLES IN SCHEMA family_calendar TO app_user;
   GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA family_calendar TO app_user;
   GRANT EXECUTE ON FUNCTION family_calendar.redeem_invite(TEXT, INTEGER) TO app_user;
+  GRANT EXECUTE ON FUNCTION family_calendar.peek_invite(TEXT) TO app_user;
 
 Then set the app's DATABASE_URL to that role — NOT to the owner, and never to a
 superuser: row-level security is skipped for superusers, which would let one

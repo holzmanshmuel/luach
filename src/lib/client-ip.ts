@@ -12,6 +12,18 @@ import type { NextRequest } from 'next/server';
  * That's the safer failure mode: never a shared lock-out.
  */
 export function clientIp(request: NextRequest): string {
-  const xff = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return clientIpFrom(request.headers);
+}
+
+/**
+ * The same key, from a bare header bag.
+ *
+ * Server Components get their headers from `await headers()`, not from a
+ * NextRequest, and the invite landing page needs the same per-IP cap the route
+ * handler it replaced had. One implementation, two entry points, so the "never key
+ * every XFF-less caller on one shared bucket" rule above cannot be re-derived wrong.
+ */
+export function clientIpFrom(headers: { get(name: string): string | null }): string {
+  const xff = headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   return xff && xff.length > 0 ? xff : randomUUID();
 }
