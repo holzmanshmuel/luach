@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/auth';
+import { withAdminOrError } from '@/lib/auth';
 import {
   createInviteToken,
   revokeToken as revokeTokenQuery,
@@ -23,30 +23,32 @@ async function buildInviteLink(token: string): Promise<string> {
   return `${base}/join/${token}`;
 }
 
+/**
+ * Both actions mint or revoke rows in the tenant-scoped `access_tokens` table, so
+ * the write must run INSIDE the tenant callback — `withAdminOrError` verifies the
+ * owner live and then runs the body under runWithTenant(). A bare
+ * `await requireAdmin()` here left the following query() with no tenant; see the
+ * note in lib/auth.ts. The role check stays inside the callback so the owner check
+ * still comes first and a stranger learns nothing about the argument.
+ */
 export async function createInviteAction(
   role: InviteRole,
   label: string | null,
 ): Promise<{ error?: string; url?: string }> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { error: 'Admin access required.' };
-  }
-  if (role !== 'editor' && role !== 'viewer') {
-    return { error: 'Pick a role.' };
-  }
-  const token = await createInviteToken(role, label || null);
-  revalidatePath('/admin/access');
-  return { url: await buildInviteLink(token) };
+  return withAdminOrError(async () => {
+    if (role !== 'editor' && role !== 'viewer') {
+      return { error: 'Pick a role.' };
+    }
+    const token = await createInviteToken(role, label || null);
+    revalidatePath('/admin/access');
+    return { url: await buildInviteLink(token) };
+  });
 }
 
 export async function revokeTokenAction(id: number): Promise<{ error?: string }> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { error: 'Admin access required.' };
-  }
-  await revokeTokenQuery(id);
-  revalidatePath('/admin/access');
-  return {};
+  return withAdminOrError(async () => {
+    await revokeTokenQuery(id);
+    revalidatePath('/admin/access');
+    return {};
+  });
 }
