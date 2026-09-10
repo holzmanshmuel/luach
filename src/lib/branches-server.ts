@@ -32,6 +32,17 @@ import {
  */
 
 /**
+ * Is this error Postgres' "column does not exist" (SQLSTATE 42703)?
+ *
+ * Exported so the decision is unit-testable without a deliberately broken
+ * database. Matched on the SQLSTATE code, never on the message text — messages
+ * are localised and reworded between server versions.
+ */
+export function isUndefinedColumn(err: unknown): boolean {
+  return (err as { code?: string } | null)?.code === '42703';
+}
+
+/**
  * A family's OWN stored list, or null when it has never set one (the state
  * migrate-v14 deliberately leaves every existing row in). Not the resolved
  * list — callers wanting the resolved one want {@link familyBranches}. Exported
@@ -46,11 +57,34 @@ import {
  */
 export const storedFamilyBranches = cache(
   async (familyId: number): Promise<string[] | null> => {
-    const rows = await systemQuery<{ branches: string[] | null }>(
-      'SELECT branches FROM family_calendar.families WHERE id = $1',
-      [familyId]
-    );
-    return rows[0]?.branches ?? null;
+    try {
+      const rows = await systemQuery<{ branches: string[] | null }>(
+        'SELECT branches FROM family_calendar.families WHERE id = $1',
+        [familyId]
+      );
+      return rows[0]?.branches ?? null;
+    } catch (err) {
+      // ── Why this catch exists ──
+      // `families.branches` arrives in migrate-v14, and this function is called
+      // from the ROOT LAYOUT — so on a deployment whose code is live but whose
+      // migration has not been run yet, an unguarded query throws
+      // `undefined_column` and EVERY signed-in page 500s. That is not
+      // hypothetical: it happened once, in production, in the minute between a
+      // push and the migration.
+      //
+      // A missing column and a NULL column mean the same thing to the caller —
+      // "this family has not chosen a list" — so answering `null` degrades
+      // exactly into the env-var fallback the resolution chain already has, and
+      // self-heals the moment the migration lands. Deploy order stops mattering.
+      //
+      // Deliberately narrow: ONLY Postgres 42703 (undefined_column) is absorbed.
+      // Every other failure — connection, permission, a genuinely broken query —
+      // rethrows, because silence about those is how a real outage hides.
+      if (isUndefinedColumn(err)) {
+        return null;
+      }
+      throw err;
+    }
   }
 );
 

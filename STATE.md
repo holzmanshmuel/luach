@@ -38,7 +38,7 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 - Four local branches still exist but are **all already merged into main** — stale refs, no
   unmerged work: `chore/parse-hebrew-date-0.2.0`, `holzmanshmuel/holzman-152-welcome-signin-affordance`,
   `holzmanshmuel/holzman-63-ical-feed-i18n`, `tools/parser-drift-audit`.
-- Tests: vitest, 34 test files / 405 tests, 10 of which hit a real Postgres. CI
+- Tests: vitest, 34 test files / 409 tests, 10 of which hit a real Postgres. CI
   (`.github/workflows/ci.yml`) runs on push to main + PRs against a throwaway `postgres:16` service
   container and uses **no GitHub secrets** on purpose, so a fork's CI runs unmodified: migrate →
   create+grant restricted role → assert not superuser/bypassrls → lint → build → `tsc --noEmit` →
@@ -47,6 +47,30 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   `N8N_TOKEN`-gated routes `/api/events/today`, `/api/digest/week`, `/api/reminders/yahrzeit`.
 
 ## Log
+
+### 2026-09-10 — a deploy ahead of its migration took production down
+
+- **What happened:** the per-family branch work was pushed and deployed before
+  `migrate-v14` had been run against the production database. `storedFamilyBranches()`
+  is called from the ROOT LAYOUT, so `SELECT branches` raised `undefined_column` and
+  **every signed-in page returned 500.** Public pages (`/welcome`, `/login`) kept working,
+  which is why an HTTP check on them looked healthy — the outage was only visible with a
+  session. Reverted within minutes, then re-landed with the guard below.
+- 🪤 **Additive migrations are not deploy-order-free just because they are additive.**
+  The documented order is migrate, then deploy. Prod DB writes here are credential- and
+  policy-gated, so "deploy now, migrate when someone runs it" is a state this app WILL
+  sit in again.
+- **The guard:** `storedFamilyBranches()` absorbs exactly SQLSTATE **42703**
+  (`undefined_column`) and answers `null`. A missing column and a NULL column mean the
+  same thing to every caller — "this family has not chosen a list" — so the read degrades
+  into the `FAMILY_BRANCHES` fallback the resolution chain already has, and self-heals the
+  moment the migration lands. Verified by dropping the column on a real database and
+  confirming the resolved list came back from the env var.
+- ⚠ **Nothing else is absorbed.** `42P01`, `42501`, connection failures and message-text
+  matches all rethrow — swallowing those is how a genuinely broken deployment hides.
+  `isUndefinedColumn()` is exported and matched on SQLSTATE, never on message text.
+- 🪤 **Public-page health checks do not prove the app is up.** Assert against a signed-in
+  page, or the check is blind to the layout, the tenant context and every guard.
 
 ### 2026-09-10 — one morning digest replaces two crons (`/api/digest/daily`)
 

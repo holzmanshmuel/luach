@@ -7,6 +7,7 @@ import {
   storedFamilyBranches,
   setFamilyBranches,
   validateBranchList,
+  isUndefinedColumn,
 } from '@/lib/branches-server';
 import {
   DEFAULT_FAMILY_BRANCHES,
@@ -35,6 +36,9 @@ import {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  // The missing-column tests spy on db.systemQuery; leaving a spy installed would
+  // silently break every later file in the run.
+  vi.restoreAllMocks();
 });
 
 async function makeFamily(name: string, branches?: string[]): Promise<number> {
@@ -343,5 +347,64 @@ describe('validateBranchList', () => {
   it('insists on at least two entries — one real side plus a catch-all', () => {
     expect(err([])).toMatch(/at least two/i);
     expect(err(['Only'])).toMatch(/at least two/i);
+  });
+});
+
+describe('storedFamilyBranches — surviving a database that predates migrate-v14', () => {
+  // This is not a hypothetical. The branch code went live one minute before its
+  // migration was applied, `SELECT branches` threw undefined_column, and because
+  // the root layout resolves the branch list, EVERY signed-in page returned 500
+  // until the deploy was reverted. The read now absorbs exactly that one error.
+
+  it('classifies only SQLSTATE 42703 as a missing column', () => {
+    expect(isUndefinedColumn({ code: '42703' })).toBe(true);
+    // Everything else must fall through and be rethrown by the caller: a dropped
+    // connection, a permission error and an undefined TABLE are all real problems.
+    expect(isUndefinedColumn({ code: '42P01' })).toBe(false); // undefined_table
+    expect(isUndefinedColumn({ code: '42501' })).toBe(false); // insufficient_privilege
+    expect(isUndefinedColumn({ code: '08006' })).toBe(false); // connection_failure
+    expect(isUndefinedColumn(new Error('column "branches" does not exist'))).toBe(false);
+    expect(isUndefinedColumn(null)).toBe(false);
+    expect(isUndefinedColumn(undefined)).toBe(false);
+  });
+
+  it('is the error real Postgres actually raises for a missing column', async () => {
+    // Ground the SQLSTATE in reality rather than a hand-written fixture: ask the
+    // live database for a column that does not exist on a table the app CAN read,
+    // and confirm the classifier recognises what comes back. This is the precise
+    // error shape the production 500s were made of.
+    let caught: unknown;
+    try {
+      await systemQuery('SELECT no_such_column FROM family_calendar.families LIMIT 1');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(isUndefinedColumn(caught)).toBe(true);
+  });
+
+  it('answers null when the column is absent, and rethrows anything else', async () => {
+    const db = await import('@/lib/db');
+
+    const undefinedColumn = Object.assign(new Error('column "branches" does not exist'), {
+      code: '42703',
+    });
+    const spy = vi.spyOn(db, 'systemQuery').mockRejectedValueOnce(undefinedColumn);
+    await expect(storedFamilyBranches(1)).resolves.toBeNull();
+    expect(spy).toHaveBeenCalled();
+
+    // A permission error is NOT a missing column and must not be swallowed —
+    // absorbing it would turn a broken deployment into silently wrong colours.
+    const denied = Object.assign(new Error('permission denied'), { code: '42501' });
+    vi.spyOn(db, 'systemQuery').mockRejectedValueOnce(denied);
+    await expect(storedFamilyBranches(2)).rejects.toThrow(/permission denied/);
+  });
+
+  it('still resolves a usable list when the family row cannot be read', async () => {
+    // A family id that does not exist stands in for "nothing stored": the
+    // resolution chain must not return an empty list, because every consumer
+    // indexes into it for colours.
+    const resolved = await familyBranches(2_000_000_000);
+    expect(resolved.length).toBeGreaterThanOrEqual(2);
   });
 });
