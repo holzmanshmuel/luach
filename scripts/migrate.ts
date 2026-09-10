@@ -35,12 +35,7 @@ const pool = new Pool({
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * seed.sql first, then migrate-v2.sql … migrate-vN.sql in numeric order.
- *
- * Discovered by glob, not listed: adding a `migrate-v<N>.sql` file is all it takes
- * to register a new migration, and there is no list here to forget to update.
- */
+/** seed.sql first, then migrate-v2.sql … migrate-vN.sql in numeric order. */
 function migrationFiles(): string[] {
   const versioned = fs
     .readdirSync(scriptsDir)

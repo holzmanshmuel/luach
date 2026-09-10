@@ -67,7 +67,7 @@ export function EditPersonModal({ person, onClose }: Props) {
   const [editNickname, setEditNickname] = useState(person.nickname ?? '');
   const [editMaiden, setEditMaiden] = useState(person.maiden_name ?? '');
   const [editBranch, setEditBranch] = useState(person.family_branch ?? '');
-  // A stored branch this family's current list doesn't have (written before the
+  // A stored branch the current FAMILY_BRANCHES doesn't list (written before the
   // list changed, or by another deployment) still gets an option of its own —
   // otherwise the <select> would render blank and quietly wipe the value on the
   // next save.

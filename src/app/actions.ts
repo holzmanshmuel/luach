@@ -676,9 +676,8 @@ export async function addBranchSpellingAction(
   const s = spelling.trim().replace(/\s+/g, ' ');
   // Only a NAMED branch can carry alternate spellings — the catch-all (the last
   // configured branch) has no surname, and an unconfigured value is not ours to
-  // invent spellings for. Checked against THIS family's list; requireEditor()
-  // above established the tenant.
-  if (!namedBranches(await familyBranches()).includes(b)) {
+  // invent spellings for.
+  if (!namedBranches(familyBranches()).includes(b)) {
     return { error: 'Please choose a family branch.' };
   }
   if (!s) return { error: 'Please enter a spelling.' };

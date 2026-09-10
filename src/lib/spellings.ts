@@ -19,16 +19,10 @@ export const SPELLINGS_COOKIE = 'name_spellings';
  * many loaders that rewrite names share a single DB read.
  */
 export const loadBranchVariants = cache(async (): Promise<Record<string, string[]>> => {
-  const [rows, branches] = await Promise.all([
-    query<{ branch: string; spelling: string }>(
-      `SELECT branch, spelling FROM family_calendar.branch_spellings`
-    ),
-    // The ACTIVE family's list — resolved from its own row, then FAMILY_BRANCHES.
-    // Callers have already established tenant context (this runs a scoped query()
-    // of its own, which throws without one).
-    familyBranches(),
-  ]);
-  return buildVariants(branches, rows);
+  const rows = await query<{ branch: string; spelling: string }>(
+    `SELECT branch, spelling FROM family_calendar.branch_spellings`
+  );
+  return buildVariants(familyBranches(), rows);
 });
 
 function readChosen(raw: string | undefined): Record<string, string> {

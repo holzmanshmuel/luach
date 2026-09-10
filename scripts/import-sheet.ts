@@ -13,10 +13,8 @@
  *   2. Hebrew Birthday  — "ח' שבט" / "8 Shvat 5745" / blank
  *   3. English Birthday — "February 8, 1961" / blank
  *   4. Anniversary      — Hebrew and/or English, separated by "~" / blank
- *   5. Branch           — OPTIONAL. One of the branch names configured for the
- *                         family you are importing into — its own list if it has
- *                         one (`/admin/branches`), else the FAMILY_BRANCHES env
- *                         var, else the built-in default (see src/lib/branches.ts).
+ *   5. Branch           — OPTIONAL. One of the names in the FAMILY_BRANCHES
+ *                         environment variable (see src/lib/branches.ts).
  *                         Blank → inferred from the surname in column 1.
  *
  * Usage:
@@ -44,7 +42,13 @@ import {
   toAppMonth,
   UnmappedHebrewMonthError,
 } from '../src/lib/sheet-import';
-import { catchAllBranch, namedBranches, resolveBranches } from '../src/lib/branches';
+import { catchAllBranch, namedBranches } from '../src/lib/branches';
+import { familyBranches } from '../src/lib/branches-server';
+
+// The configured branch list (FAMILY_BRANCHES env var; the demo family's when
+// unset). Read once — see src/lib/branches.ts for the ordering rules.
+const BRANCHES = familyBranches();
+const CATCH_ALL = catchAllBranch(BRANCHES) ?? 'Other';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -113,20 +117,20 @@ function parseCsvLine(line: string): string[] {
 /**
  * Infer which family branch a person belongs to from the surname in their name.
  *
- * Matches against `branches` — the branch list of the family named by
- * `--family=<id>`, NOT a deployment-wide setting (see main()). Anyone whose name
- * matches none of the named branches lands in the catch-all (the LAST entry),
- * which you can fix in the app afterwards.
+ * Matches against the branch surnames in the `FAMILY_BRANCHES` environment
+ * variable — so once that names your own family's branches, this needs no
+ * editing. Anyone whose name matches none of them lands in the catch-all (the
+ * LAST configured branch), which you can fix in the app afterwards.
  *
  * If your spreadsheet has an explicit branch column instead, pass it as the 5th
  * CSV column and it wins over this inference.
  */
-function inferBranch(name: string, branches: readonly string[]): string {
+function inferBranch(name: string): string {
   const n = name.toLowerCase();
-  for (const branch of namedBranches(branches)) {
+  for (const branch of namedBranches(BRANCHES)) {
     if (n.includes(branch.toLowerCase())) return branch;
   }
-  return catchAllBranch(branches) ?? 'Other';
+  return CATCH_ALL;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,18 +153,10 @@ async function main() {
   const client = await pool.connect();
   await client.query("SELECT set_config('app.current_family', $1, false)", [String(FAMILY_ID)]);
 
-  // Confirm the family actually exists before we delete anything, and pick up its
-  // own branch list in the same read. `families` is one of the non-RLS tenancy
-  // tables, so this reads normally.
-  //
-  // Read here rather than via familyBranches() from src/lib/branches-server.ts on
-  // purpose: that module goes through src/lib/db.ts, whose pool is cached in a
-  // global and never closed, which would leave this script hanging after its own
-  // pool.end(). The resolution CHAIN is the shared pure function, so the script
-  // cannot drift from the app: this family's stored list → FAMILY_BRANCHES →
-  // the built-in default.
-  const fam = await client.query<{ name: string; branches: string[] | null }>(
-    'SELECT name, branches FROM family_calendar.families WHERE id = $1',
+  // Confirm the family actually exists before we delete anything. `families` is
+  // one of the non-RLS tenancy tables, so this reads normally.
+  const fam = await client.query<{ name: string }>(
+    'SELECT name FROM family_calendar.families WHERE id = $1',
     [FAMILY_ID]
   );
   if (fam.rows.length === 0) {
@@ -170,8 +166,6 @@ async function main() {
     await pool.end();
     process.exit(1);
   }
-
-  const BRANCHES = resolveBranches(fam.rows[0].branches, process.env.FAMILY_BRANCHES);
 
   const csvContent = fs.readFileSync(CSV_PATH, 'utf-8');
   const lines = csvContent.split('\n').filter(line => line.trim());
@@ -183,7 +177,6 @@ async function main() {
   console.log(`======================`);
   console.log(`CSV file: ${path.resolve(CSV_PATH)}`);
   console.log(`Family:   ${fam.rows[0].name} (id ${FAMILY_ID})`);
-  console.log(`Branches: ${BRANCHES.join(', ')}  (catch-all: ${catchAllBranch(BRANCHES)})`);
   console.log(`Data rows: ${dataLines.length}`);
   console.log('');
 
@@ -210,7 +203,7 @@ async function main() {
     const branch =
       explicit && BRANCHES.includes(explicit)
         ? explicit
-        : inferBranch(name, BRANCHES);
+        : inferBranch(name);
 
     // Insert family member
     const memberResult = await client.query(

@@ -30,13 +30,11 @@ export const EVENT_TYPES: { value: EventType; label: string; icon: string }[] = 
  * are on. Used to tint avatars, tree cards and timeline entries, and as the key
  * for the per-viewer surname-spelling feature (see `lib/spelling-core.ts`).
  *
- * ── SELF-HOSTERS: THIS IS DATA, NOT CODE. ──
- * The list of branches is PER FAMILY — `families.branches`, edited by the family's
- * owner at `/admin/branches`, falling back to the `FAMILY_BRANCHES` environment
- * variable and then to the built-in default (see `lib/branches.ts` for the
- * resolution chain and the ORDER-IS-LOAD-BEARING colour rule, and
- * `lib/branches-server.ts` for the read). Nothing here needs editing to run the
- * app for a different family.
+ * ── SELF-HOSTERS: THIS IS CONFIGURATION, NOT CODE. ──
+ * The list of branches comes from the `FAMILY_BRANCHES` environment variable at
+ * runtime (see `lib/branches.ts` for the parsing and the ORDER-IS-LOAD-BEARING
+ * colour rule, and `lib/branches-server.ts` for the read). Nothing here needs
+ * editing to run the app for a different family.
  *
  * The type is deliberately a bare `string`: `family_members.family_branch` is a
  * plain TEXT column with no constraint, so a database routinely holds values the
