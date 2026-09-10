@@ -121,9 +121,9 @@ export type BranchListProblem = string;
  * action and its tests, so the rules cannot drift between them.
  *
  * Returns the sanitized list on success. Guards, in the order an owner hits them:
- * something must be left after trimming; at least two entries (one real branch
- * plus the catch-all — a one-entry list is nothing but a catch-all); no absurd
- * count or length; no duplicates, INCLUDING ones that differ only in case or
+ * either none at all (a new family sorts nobody by side) or at least two (one
+ * real branch plus the catch-all — a one-entry list is nothing but a catch-all);
+ * no absurd count or length; no duplicates, INCLUDING ones that differ only in case or
  * spacing, because two chips reading the same word is indistinguishable from a
  * bug. Duplicates are reported rather than silently collapsed: silently dropping
  * one shifts every later entry's position, and position is colour.
@@ -155,8 +155,13 @@ export function validateBranchList(
   // Cleaning is now a no-op given the checks above, but run it so the value
   // written is always the sanitized shape the resolver expects.
   const branches = sanitizeBranchList(raw);
-  if (branches.length < 2) {
-    return { error: 'Keep at least two branches: one real side of the family, plus a catch-all last.' };
+  // An EMPTY list is legitimate and is where every new family starts: "we don't
+  // sort anyone by side". Everyone renders neutral and nothing leaks. What is not
+  // legitimate is a list of exactly one, which is a catch-all with nothing to
+  // catch — the single entry would be drawn neutral anyway, so it only looks like
+  // a branch that isn't working.
+  if (branches.length === 1) {
+    return { error: 'One branch on its own does nothing. Add a second — a real side of the family, plus a catch-all last — or remove it to sort nobody by side.' };
   }
   return { branches };
 }

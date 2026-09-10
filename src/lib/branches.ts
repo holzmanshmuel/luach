@@ -99,8 +99,20 @@ export function resolveBranches(
   stored: readonly string[] | null | undefined,
   envValue: string | null | undefined
 ): string[] {
-  const own = sanitizeBranchList(stored);
-  return own.length > 0 ? own : parseBranchList(envValue);
+  // NULL and an EMPTY LIST are different answers, and the difference is privacy.
+  //
+  //   null  → "this family predates per-family branches" → inherit the deployment's
+  //           FAMILY_BRANCHES. This is the migration path, and the ONLY thing that
+  //           env var is for.
+  //   []    → "this family has no sides set up yet" → no branches, everyone neutral.
+  //           Every family created from now on starts here.
+  //
+  // Collapsing the two — treating [] as "unset" and falling through to the env —
+  // would show a brand-new, unrelated family the OPERATOR'S REAL SURNAMES as their
+  // branch chips. On a multi-family deployment that is a PII leak from one tenant
+  // to every other, not a cosmetic default.
+  if (stored != null) return sanitizeBranchList(stored);
+  return parseBranchList(envValue);
 }
 
 /**

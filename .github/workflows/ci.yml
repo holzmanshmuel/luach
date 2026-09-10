@@ -84,6 +84,11 @@ jobs:
           }
 
           // Verbatim from README "Self-hosting → 1. Database" / SETUP.md step 2.
+          // KEEP IN SYNC when a SECURITY DEFINER function is added. The migrations
+          // also grant to this role, but conditionally on it already existing — and
+          // here the role is created AFTER they run, so that grant never fires and
+          // the only thing standing between a new function and "permission denied"
+          // is this list. src/lib/db-grants.test.ts fails when they drift.
           const statements = [
             `CREATE ROLE ${role} LOGIN PASSWORD '${password}'`,
             `GRANT USAGE ON SCHEMA family_calendar TO ${role}`,
@@ -91,6 +96,7 @@ jobs:
                ON ALL TABLES IN SCHEMA family_calendar TO ${role}`,
             `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA family_calendar TO ${role}`,
             `GRANT EXECUTE ON FUNCTION family_calendar.redeem_invite(TEXT, INTEGER) TO ${role}`,
+            `GRANT EXECUTE ON FUNCTION family_calendar.peek_invite(TEXT) TO ${role}`,
           ];
 
           (async () => {

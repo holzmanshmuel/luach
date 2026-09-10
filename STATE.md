@@ -45,7 +45,7 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 - Four local branches still exist but are **all already merged into main** — stale refs, no
   unmerged work: `chore/parse-hebrew-date-0.2.0`, `holzmanshmuel/holzman-152-welcome-signin-affordance`,
   `holzmanshmuel/holzman-63-ical-feed-i18n`, `tools/parser-drift-audit`.
-- Tests: vitest, 39 test files / 467 tests, 11 of which hit a real Postgres. CI
+- Tests: vitest, 40 test files / 473 tests, 12 of which hit a real Postgres. CI
   (`.github/workflows/ci.yml`) runs on push to main + PRs against a throwaway `postgres:16` service
   container and uses **no GitHub secrets** on purpose, so a fork's CI runs unmodified: migrate →
   create+grant restricted role → assert not superuser/bypassrls → lint → build → `tsc --noEmit` →
@@ -54,6 +54,40 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   `N8N_TOKEN`-gated routes `/api/events/today`, `/api/digest/week`, `/api/reminders/yahrzeit`.
 
 ## Log
+
+### 2026-09-10 — a new family must never inherit the operator's surnames
+
+- **The v14 fallback chain leaked one tenant's PII into every other.** `NULL branches`
+  meant "inherit `FAMILY_BRANCHES`", and a newly created family was left NULL — so a
+  stranger signing up on the hosted deployment would have seen **the operator's real
+  family surnames** as their own branch chips. Per-family branches existed to stop exactly
+  that and stopped one step short.
+- **NULL and empty are now different answers, and the difference is privacy:**
+  `NULL` → predates per-family branches, inherit the env var (a finite, shrinking set of
+  rows); `{}` → no sides set up yet, everyone neutral; `{…}` → the family's own list.
+  `createFamilyWithOwner()` stamps `'{}'`, so **the env var can never reach a family
+  created from now on.**
+- `migrate-v16` relaxes v14's CHECK floor from `cardinality >= 1` to `>= 0`. **v14 was left
+  exactly as it shipped** — it had already run in production, and editing an applied
+  migration makes the database and the file disagree about history.
+- `validateBranchList` now accepts an empty list (a real state: "sort nobody by side") and
+  rejects a list of exactly ONE — a catch-all with nothing to catch, drawn neutral anyway,
+  so it only looks like a branch that is broken.
+- 🪤 **Two tests asserted the leak as correct behaviour** — `branches.test.ts` had
+  "treats an empty stored list as *not set*" and `branches-server.test.ts` insisted on a
+  ≥2 floor. Both were written deliberately and both encoded the bug. **A test passing does
+  not mean the behaviour is right; it means the behaviour is what someone wrote down.**
+
+### 2026-09-10 — CI's role grants drifted from the migrations
+
+- **`peek_invite` shipped with its grant in the migration, README and SETUP.md — but not in
+  `.github/workflows/ci.yml`.** The migration's grant is conditional on the role existing,
+  and **CI creates the restricted role AFTER migrating**, so the grant silently no-opped
+  and 9 tests failed on CI having passed locally (where the role predated the migration).
+- Fixed the list, and added `src/lib/db-grants.test.ts`, which asks the DATABASE which
+  SECURITY DEFINER functions exist and asserts the connecting role can EXECUTE every one.
+  **Enumerating from the schema rather than from a hand-kept list is what makes the next
+  one impossible to forget.**
 
 ### 2026-09-10 — ⚠️ TWO MIGRATIONS PENDING ON PRODUCTION
 

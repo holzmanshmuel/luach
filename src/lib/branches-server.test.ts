@@ -9,7 +9,9 @@ import {
   validateBranchList,
   isUndefinedColumn,
 } from '@/lib/branches-server';
+import { createFamilyWithOwner } from '@/lib/users';
 import {
+  resolveBranches,
   DEFAULT_FAMILY_BRANCHES,
   MAX_BRANCHES,
   MAX_BRANCH_NAME_LENGTH,
@@ -344,9 +346,14 @@ describe('validateBranchList', () => {
     expect(ok([...Array(MAX_BRANCHES).keys()].map(i => `B${i}`))).toHaveLength(MAX_BRANCHES);
   });
 
-  it('insists on at least two entries — one real side plus a catch-all', () => {
-    expect(err([])).toMatch(/at least two/i);
-    expect(err(['Only'])).toMatch(/at least two/i);
+  it('rejects a lone branch, but ALLOWS clearing the list entirely', () => {
+    // A single entry is a catch-all with nothing to catch — it renders neutral
+    // anyway, so it only looks like a branch that is broken.
+    expect(err(['Only'])).toMatch(/does nothing/i);
+    // Empty is a real, useful state and is where every new family starts: sort
+    // nobody by side. It is also what keeps a new family off the operator's
+    // FAMILY_BRANCHES, so this must stay permitted.
+    expect(validateBranchList([])).toEqual({ branches: [] });
   });
 });
 
@@ -406,5 +413,54 @@ describe('storedFamilyBranches — surviving a database that predates migrate-v1
     // indexes into it for colours.
     const resolved = await familyBranches(2_000_000_000);
     expect(resolved.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('a new family never inherits the operator’s surnames', () => {
+  // The whole point of per-family branches. A brand-new, unrelated family signing
+  // up on a shared deployment must NOT be shown the operator's real family
+  // surnames as their branch chips — that is one tenant's personal data appearing
+  // inside another tenant's calendar. NULL means "predates per-family branches,
+  // inherit the env var"; empty means "no sides set up yet". Never collapse them.
+  it('resolves an empty stored list to no branches, not to FAMILY_BRANCHES', () => {
+    vi.stubEnv('FAMILY_BRANCHES', 'Aleph,Bet,Other');
+    expect(resolveBranches([], process.env.FAMILY_BRANCHES)).toEqual([]);
+  });
+
+  it('still lets a pre-existing family (NULL) inherit the env var', () => {
+    vi.stubEnv('FAMILY_BRANCHES', 'Aleph,Bet,Other');
+    expect(resolveBranches(null, process.env.FAMILY_BRANCHES)).toEqual(['Aleph', 'Bet', 'Other']);
+  });
+
+  it('stamps a newly created family with an empty list, not NULL', async () => {
+    const { upsertUser } = await import('@/lib/users');
+    const sub = `test-branch-seed-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const { id: userId } = await upsertUser({ sub, email: `${sub}@example.com` });
+    const [family] = await systemQuery<{ id: number }>(
+      `SELECT id FROM family_calendar.families WHERE id = $1`,
+      [(await createFamilyWithOwner(userId, 'Seed Test Family')).familyId]
+    );
+    try {
+      const [row] = await systemQuery<{ branches: string[] | null }>(
+        'SELECT branches FROM family_calendar.families WHERE id = $1',
+        [family.id]
+      );
+      // Not null — null would mean "inherit the deployment's list".
+      expect(row.branches).not.toBeNull();
+      expect(row.branches).toEqual([]);
+
+      vi.stubEnv('FAMILY_BRANCHES', 'Aleph,Bet,Other');
+      await expect(familyBranches(family.id)).resolves.toEqual([]);
+    } finally {
+      await systemQuery('DELETE FROM family_calendar.memberships WHERE family_id = $1', [family.id]);
+      await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [family.id]);
+      await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
+    }
+  });
+
+  it('accepts clearing the list, and rejects a lone branch', () => {
+    expect(validateBranchList([])).toEqual({ branches: [] });
+    const lone = validateBranchList(['Solo']);
+    expect('error' in lone && lone.error).toMatch(/does nothing/i);
   });
 });

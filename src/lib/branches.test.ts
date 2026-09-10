@@ -187,11 +187,26 @@ describe('resolveBranches — the fallback chain', () => {
     expect(resolveBranches(undefined, null)).toEqual([...DEFAULT_FAMILY_BRANCHES]);
   });
 
-  it('treats an empty or all-blank stored list as "not set", not as "no branches"', () => {
-    // A family with zero branches would have no catch-all and could file nobody.
-    expect(resolveBranches([], ENV)).toEqual(['Env1', 'Env2', 'EnvRest']);
-    expect(resolveBranches(['  ', ''], ENV)).toEqual(['Env1', 'Env2', 'EnvRest']);
-    expect(resolveBranches([], undefined)).toEqual([...DEFAULT_FAMILY_BRANCHES]);
+  it('treats an empty stored list as "no branches", NOT as "not set"', () => {
+    // This distinction is a privacy boundary, not a nicety. The env var holds the
+    // OPERATOR'S REAL SURNAMES. Falling back to it for a family that has simply
+    // not chosen any sides would paint an unrelated family's calendar with
+    // another family's names — so an explicit empty list must stay empty.
+    // Only NULL/undefined ("this row predates per-family branches") inherits.
+    expect(resolveBranches([], ENV)).toEqual([]);
+    expect(resolveBranches(['  ', ''], ENV)).toEqual([]);
+    expect(resolveBranches([], undefined)).toEqual([]);
+  });
+
+  it('renders anyone neutral when a family has no branches at all', () => {
+    // Nothing may throw or narrow on the empty list: no catch-all, no named
+    // branches, and every person falls to the neutral treatment.
+    expect(catchAllBranch([])).toBeNull();
+    expect(namedBranches([])).toEqual([]);
+    expect(branchSlot([], 'Anything')).toBe(-1);
+    expect(branchStyle([], 'Anything')).toEqual(NEUTRAL_BRANCH_STYLE);
+    expect(branchStyle([], null)).toEqual(NEUTRAL_BRANCH_STYLE);
+    expect(isCatchAllBranch([], 'Anything')).toBe(true);
   });
 
   it('sanitizes a stored list on the way out', () => {

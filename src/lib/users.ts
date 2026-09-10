@@ -54,9 +54,14 @@ export async function createFamilyWithOwner(
   nameHe?: string | null
 ): Promise<{ familyId: number }> {
   return withSystemTransaction(async (run) => {
+    // branches = '{}' (empty, NOT null) on purpose. NULL means "predates per-family
+    // branches, inherit this deployment's FAMILY_BRANCHES" — which for a brand-new,
+    // unrelated family would mean wearing the operator's real family surnames as
+    // their own branch chips. A new family starts with no sides defined: everyone
+    // renders neutral until an owner adds their own at /admin/branches.
     const [family] = await run<{ id: number }>(
-      `INSERT INTO family_calendar.families (name, name_he)
-       VALUES ($1, $2) RETURNING id`,
+      `INSERT INTO family_calendar.families (name, name_he, branches)
+       VALUES ($1, $2, '{}') RETURNING id`,
       [name, nameHe ?? null]
     );
     await run(
