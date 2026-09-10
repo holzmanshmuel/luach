@@ -2,6 +2,62 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { SessionData, sessionOptions } from '@/lib/auth';
 
+/**
+ * The public host this deployment answers on, from its own configuration.
+ *
+ * Read from `NEXTAUTH_URL` — never from the incoming request, which is the whole
+ * point: an attacker controls request headers, so deriving the "expected" host
+ * from one would turn the check below into a no-op.
+ */
+const PUBLIC_HOST = (() => {
+  const configured = process.env.NEXTAUTH_URL;
+  if (!configured) return null;
+  try {
+    return new URL(configured).host || null;
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * Let Server Actions survive a reverse proxy.
+ *
+ * ── THE BUG THIS FIXES ──
+ * Next compares a Server Action request's `Origin` header against the host it
+ * believes it is serving (`x-forwarded-host`) and aborts on a mismatch, as a CSRF
+ * defence. Behind the Cloudflare Worker in front of this app those two can never
+ * agree: the browser sends the public domain, the Worker forwards Railway's
+ * internal hostname. Next therefore rejected EVERY Server Action —
+ * "Invalid Server Actions request" — which killed every edit in the app (adding an
+ * event, editing a person, saving a phone number, correcting a date) while route
+ * handlers, page rendering and sign-in all kept working. The site looked healthy;
+ * only writing was dead.
+ *
+ * ⚠️ `next.config.ts`'s `serverActions.allowedOrigins` is the documented fix and it
+ * does NOT work here: that value is baked in during `next build`, this image is
+ * built from a Dockerfile, and the Dockerfile declares no build arg for
+ * `NEXTAUTH_URL` — so at build time the list resolves EMPTY and the setting
+ * silently does nothing. Doing it here instead makes it a runtime concern, which
+ * is what it actually is.
+ *
+ * ── WHY THIS IS STILL SAFE ──
+ * The forwarded host is replaced with the host this deployment is CONFIGURED to
+ * serve, not with anything from the request. Next then compares the browser's
+ * `Origin` against that fixed value, so the CSRF check is preserved in full: a
+ * request from evil.example.test still mismatches and is still aborted.
+ */
+function passThrough(request: NextRequest): NextResponse {
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (!PUBLIC_HOST || forwardedHost === PUBLIC_HOST) {
+    // Nothing to repair: either this deployment declares no public host, or the
+    // proxy in front already forwards the right one.
+    return NextResponse.next();
+  }
+  const headers = new Headers(request.headers);
+  headers.set('x-forwarded-host', PUBLIC_HOST);
+  return NextResponse.next({ request: { headers } });
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -12,7 +68,7 @@ export async function proxy(request: NextRequest) {
   // allowlisted; they fall through to the cookie gate below (and re-check live
   // membership themselves).
   if (pathname.startsWith('/api/calendar.ics')) {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Always allow the n8n feeds (they authenticate via N8N_TOKEN header/query)
@@ -22,7 +78,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/api/reminders/') ||
     pathname.startsWith('/api/families')
   ) {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Always allow the login page and invite join links, and internal assets.
@@ -48,7 +104,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   ) {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Always allow onboarding. A just-signed-in user with NO family has a userId but
@@ -57,7 +113,7 @@ export async function proxy(request: NextRequest) {
   // create their first family. The /onboarding page itself enforces userId
   // server-side (redirects signed-out visitors to /login).
   if (pathname === '/onboarding') {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Always allow the Google OAuth entry + callback (they run BEFORE a session
@@ -67,7 +123,7 @@ export async function proxy(request: NextRequest) {
     pathname === '/api/auth/google' ||
     pathname === '/api/auth/google/callback'
   ) {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Always allow sign-out. Signing out must work from a HALF-established session —
@@ -78,7 +134,7 @@ export async function proxy(request: NextRequest) {
   // and they could never get out of the wrong account. Destroying a session (or a
   // non-existent one) needs no authorization.
   if (pathname === '/api/logout') {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Always allow the PWA manifest + icons (fetched unauthenticated by browsers/OS
@@ -88,17 +144,17 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/icons/') ||
     pathname === '/apple-touch-icon.png'
   ) {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Always allow the service worker script + its offline fallback shell —
   // both must be reachable without a session (the SW itself has no
   // cookies, and /offline is what it serves when there's no network).
   if (pathname === '/sw.js' || pathname === '/offline') {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
-  const response = NextResponse.next();
+  const response = passThrough(request);
   const session = await getIronSession<SessionData>(request, response, sessionOptions);
 
   // Coarse cookie-level gate only. Real authorization (live membership + role) is

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { proxy } from '@/proxy';
@@ -138,5 +138,88 @@ describe('proxy cookie gate — unchanged behaviour', () => {
     expect((await visit('/api/digest/week')).location).toBeNull();
     expect((await visit('/api/reminders/yahrzeit')).location).toBeNull();
     expect((await visit('/api/families')).location).toBeNull();
+  });
+});
+
+/**
+ * Server Actions behind a reverse proxy.
+ *
+ * A production outage: the Cloudflare Worker forwards `x-forwarded-host` as
+ * Railway's internal hostname while the browser's `Origin` is the public domain.
+ * Next compares the two, decides it is looking at a CSRF attempt, and aborts EVERY
+ * Server Action — so every edit in the app failed with a bare "This page couldn't
+ * load", while pages, sign-in and route handlers all kept working.
+ *
+ * The documented fix (`serverActions.allowedOrigins` in next.config) is baked in at
+ * BUILD time and silently resolved empty here, because the image is built from a
+ * Dockerfile that declares no build arg for NEXTAUTH_URL. So the proxy repairs the
+ * header at runtime instead.
+ */
+/**
+ * Re-evaluate the proxy module so its module-scope PUBLIC_HOST is recomputed from
+ * the current environment. `vi.resetModules()` is what makes this honest — without
+ * it every test would share the host captured at the first import, and the tests
+ * would pass or fail together for the wrong reason.
+ */
+async function freshModule() {
+  vi.resetModules();
+  return import('@/proxy');
+}
+
+describe('forwarded host rewriting', () => {
+  const PUBLIC = 'calendar.example.test';
+  const INTERNAL = 'app-production-1234.up.railway.app';
+
+  /** The header names middleware asks Next to override on the onward request. */
+  const overridden = (res: Response) =>
+    (res.headers.get('x-middleware-override-headers') ?? '').split(',').map(s => s.trim());
+  const forwardedTo = (res: Response) => res.headers.get('x-middleware-request-x-forwarded-host');
+
+  it('replaces an internal forwarded host with the configured public one', async () => {
+    process.env.NEXTAUTH_URL = `https://${PUBLIC}`;
+    const { proxy: freshProxy } = await freshModule();
+    const req = new NextRequest('https://calendar.example.test/welcome', {
+      headers: { 'x-forwarded-host': INTERNAL, origin: `https://${PUBLIC}` },
+    });
+    const res = await freshProxy(req);
+    expect(overridden(res)).toContain('x-forwarded-host');
+    expect(forwardedTo(res)).toBe(PUBLIC);
+  });
+
+  it('takes the expected host from configuration, never from the request', async () => {
+    // The whole point: if the "expected" host were read off the request, an attacker
+    // would simply send their own and the CSRF check would become a no-op.
+    process.env.NEXTAUTH_URL = `https://${PUBLIC}`;
+    const { proxy: freshProxy } = await freshModule();
+    const req = new NextRequest('https://calendar.example.test/welcome', {
+      headers: { 'x-forwarded-host': 'evil.example.test', origin: 'https://evil.example.test' },
+    });
+    const res = await freshProxy(req);
+    expect(forwardedTo(res)).toBe(PUBLIC);
+    expect(forwardedTo(res)).not.toBe('evil.example.test');
+  });
+
+  it('leaves the request alone when the forwarded host already matches', async () => {
+    process.env.NEXTAUTH_URL = `https://${PUBLIC}`;
+    const { proxy: freshProxy } = await freshModule();
+    const req = new NextRequest('https://calendar.example.test/welcome', {
+      headers: { 'x-forwarded-host': PUBLIC },
+    });
+    const res = await freshProxy(req);
+    expect(forwardedTo(res)).toBeNull();
+  });
+
+  it('does nothing when NEXTAUTH_URL is unset — no host to trust', async () => {
+    delete process.env.NEXTAUTH_URL;
+    const { proxy: freshProxy } = await freshModule();
+    const req = new NextRequest('https://calendar.example.test/welcome', {
+      headers: { 'x-forwarded-host': INTERNAL },
+    });
+    const res = await freshProxy(req);
+    expect(forwardedTo(res)).toBeNull();
+  });
+
+  afterAll(() => {
+    delete process.env.NEXTAUTH_URL;
   });
 });

@@ -25,8 +25,14 @@ const securityHeaders = [
  * risk — which kills every edit in the app while leaving pages and sign-in
  * working, so the site looks healthy. See src/lib/server-action-origins.ts.
  *
- * ⚠️ Read at BUILD time: `next build` bakes the resolved list into the standalone
- * output, so changing the variable needs a redeploy, not a restart.
+ * ⚠️ **This alone does not fix the hosted deployment, and did not.** The list is
+ * resolved during `next build` and baked into the standalone output — but this image
+ * is built from a Dockerfile that declares no build arg for `NEXTAUTH_URL`, so at
+ * build time it resolves EMPTY and the setting silently does nothing. The real repair
+ * happens at runtime in `src/proxy.ts`, which rewrites `x-forwarded-host` to the
+ * configured public host. This stays for deployments that DO have the variable at
+ * build time (`next start` from a plain checkout, Vercel, a Dockerfile with the arg),
+ * where it is the documented and more direct fix.
  */
 const allowedOrigins = resolveServerActionOrigins(process.env);
 
