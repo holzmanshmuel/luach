@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, systemQuery } from '@/lib/db';
 import { runWithTenant } from '@/lib/tenant';
 import { EventWithMember } from '@/lib/types';
-import { hebrewToGregorianAll, yearsSince } from '@/lib/hebrew';
+import { hebrewToGregorianAll } from '@/lib/hebrew';
 import { safeEqual } from '@/lib/safe-equal';
-import { fullName } from '@/lib/names';
-import { oneLine } from '@/lib/text';
-import { ordinal } from '@/lib/event-phrase';
+import { memberRecipients, memorialText } from '@/lib/digest';
 import { configuredSiteUrl } from '@/lib/base-url';
 import {
   clampLead,
@@ -113,27 +111,23 @@ export async function GET(request: NextRequest) {
           if (ymd(d) !== targetKey) continue;
           if (seen.has(row.id.toString())) continue;
           seen.add(row.id.toString());
-          const n = yearsSince(d, row); // Hebrew-year count (correct across Jan 1)
-          const yearsLabel = n && n > 0 ? ` (${ordinal(n)} yahrzeit)` : '';
-          // Sanitize the user-controlled name so a smuggled newline can't inject
-          // extra spoofed lines into the broadcast message.
-          lines.push(`🕯️ ${oneLine(fullName(row))}${yearsLabel}`);
+          // memorialText() appends the Hebrew-year count (correct across Jan 1)
+          // and sanitizes the user-controlled name, so a smuggled newline can't
+          // inject extra spoofed lines into the broadcast message. Shared with
+          // /api/digest/daily's "Tonight begins" block — same wording.
+          lines.push(`🕯️ ${memorialText(row, d)}`);
         }
       }
     }
 
     const message = buildYahrzeitMessage(lines, target, lead, siteUrl);
 
+    // The DIGEST_RECIPIENTS env list is deployment-wide, so on a multi-family
+    // instance it puts the operator on EVERY family's reminder. Kept here because
+    // self-hosters' running workflows rely on it; /api/digest/daily omits it.
     const envRecipients = (process.env.DIGEST_RECIPIENTS ?? '')
       .split(',').map(s => s.trim()).filter(Boolean);
-    const recipients = [
-      ...new Set([
-        ...rows
-          .filter(r => r.notifications_enabled && r.phone_e164 && r.phone_e164.trim())
-          .map(r => r.phone_e164!.trim()),
-        ...envRecipients,
-      ]),
-    ];
+    const recipients = [...new Set([...memberRecipients(rows), ...envRecipients])];
 
     return NextResponse.json({
       date: targetKey,

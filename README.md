@@ -47,9 +47,13 @@ repo — see [the demo family](#4-optional--the-demo-family).*
 - **Subscribable calendar feed.** Each family gets its own iCal URL, so every
   relative adds it once to Google or Apple Calendar and gets the birthdays and
   yahrzeits in their own calendar forever.
-- **WhatsApp digests and reminders** — an optional weekly digest and a
-  yahrzeit-eve reminder, sent via [n8n](https://n8n.io) and a WhatsApp gateway
-  you run. See [SETUP-WHATSAPP.md](./SETUP-WHATSAPP.md).
+- **WhatsApp digests and reminders** — an optional **one message each morning**
+  per family: today's events, the yahrzeits that begin at nightfall tonight, and
+  on Sundays the week ahead. `GET /api/digest/daily?family=<id>` returns the
+  ready-to-send text plus the recipients, and [n8n](https://n8n.io) plus a
+  WhatsApp gateway you run does the sending. Earlier per-purpose feeds
+  (`/api/events/today`, `/api/digest/week`, `/api/reminders/yahrzeit`) are still
+  there. See [SETUP-WHATSAPP.md](./SETUP-WHATSAPP.md).
 - **Multi-family.** One deployment hosts many unrelated families, isolated from
   each other by Postgres row-level security. If you belong to more than one —
   your side and your in-laws' — there is a **combined view** that merges both
@@ -131,7 +135,8 @@ Fill it in — `.env.example` documents each variable:
 | `NEXTAUTH_URL` | in prod | Your public origin, used to build invite and feed URLs. The WhatsApp broadcast feeds **500 rather than guess** if it is unset — there is no default |
 | `FAMILY_BRANCHES` | optional | Your family's branch surnames, comma-separated — see [Family branches](#family-branches). Unset = the demo family's |
 | `N8N_TOKEN` | optional | Bearer token for the automation feeds — **a deployment secret; it reads across families** |
-| `DIGEST_RECIPIENTS` | optional | Extra comma-separated E.164 numbers for digests |
+| `TZ` | in prod | The zone a day is reckoned in, e.g. `Asia/Jerusalem`. `/api/digest/daily` decides what "today" is — and whether today is Sunday — in this zone; unset means the container's (usually UTC), which turns the day over hours early or late |
+| `DIGEST_RECIPIENTS` | legacy | Extra comma-separated E.164 numbers added to `/api/digest/week` and `/api/reminders/yahrzeit`. **Deployment-wide, so it cannot be right on a multi-family instance** — `/api/digest/daily` ignores it and takes only opted-in family members. See [SETUP-WHATSAPP.md](./SETUP-WHATSAPP.md) |
 
 ### Family branches
 

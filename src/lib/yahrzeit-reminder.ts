@@ -12,6 +12,11 @@
  *     nightly candle reminder.
  */
 
+import { fmtLongDay } from './zoned-day';
+
+/** Local `YYYY-MM-DD` (never toISOString — that shifts by the TZ offset). */
+export { ymd } from './zoned-day';
+
 export const DEFAULT_LEAD_DAYS = 1;
 export const MAX_LEAD_DAYS = 60;
 
@@ -27,15 +32,8 @@ export function clampLead(raw: string | null | undefined): number {
   return n;
 }
 
-/** Local YYYY-MM-DD (never toISOString — that shifts by the TZ offset). */
-export function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 /** A friendly "Friday, August 21" style day label. */
-export function fmtDay(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-}
+export const fmtDay = fmtLongDay;
 
 /**
  * The Gregorian date a reminder with this lead targets: `lead` days from the
