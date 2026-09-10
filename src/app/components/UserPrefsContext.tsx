@@ -14,11 +14,12 @@ interface UserPrefs {
   toggleNicknames: () => void;
   t: (key: string) => string;
   /**
-   * The configured family branches, IN ORDER — resolved from the server's
-   * `FAMILY_BRANCHES` and handed down by the root layout. Order is load-bearing:
-   * it decides each branch's colour (see `lib/branches.ts`), and the last entry
-   * is the catch-all. Client components read the list from here rather than from
-   * the environment, which does not exist in the browser.
+   * The ACTIVE FAMILY's branches, IN ORDER — resolved on the server (the family's
+   * own stored list, else `FAMILY_BRANCHES`, else the built-in default) and handed
+   * down by the root layout. Order is load-bearing: it decides each branch's
+   * colour (see `lib/branches.ts`), and the last entry is the catch-all. Client
+   * components read the list from here rather than resolving it themselves — it is
+   * per-family data in Postgres, which the browser cannot see.
    */
   branches: string[];
   /** branch -> all accepted spellings (branch value first). */
@@ -66,7 +67,7 @@ export function UserPrefsProvider({
   language: Lang;
   isAdmin?: boolean;
   canEdit?: boolean;
-  /** Configured branch list, in order — from `familyBranches()` on the server. */
+  /** This family's branch list, in order — from `familyBranches()` on the server. */
   branches: string[];
   spellings?: Record<string, string>;
   branchVariants?: Record<string, string[]>;

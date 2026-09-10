@@ -101,10 +101,13 @@ export default async function RootLayout({
           language={lang}
           isAdmin={isAdmin}
           canEdit={canEdit}
-          // Read here, on the server, and handed down as a prop: FAMILY_BRANCHES
-          // is a runtime variable and does not exist in the browser bundle. This
-          // is the single point where the configured list enters the UI.
-          branches={familyBranches()}
+          // Resolved here, on the server, and handed down as a prop: the list is
+          // per-family data in Postgres (with FAMILY_BRANCHES as the fallback),
+          // so the browser bundle cannot know it. This is the single point where
+          // the resolved list enters the UI. establishTenant() above has already
+          // entered the tenant, so this reads THIS family's list; a signed-out
+          // visitor has no tenant and gets the deployment default.
+          branches={await familyBranches()}
           spellings={vs.chosen}
           branchVariants={vs.variants}
         >
