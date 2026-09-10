@@ -12,6 +12,7 @@ import {
   targetDateForLead,
   buildYahrzeitMessage,
 } from '@/lib/yahrzeit-reminder';
+import { civilDayInZone } from '@/lib/zoned-day';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,12 +36,6 @@ export const dynamic = 'force-dynamic';
 interface MemberEvent extends EventWithMember {
   phone_e164: string | null;
   notifications_enabled: boolean;
-}
-
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
 }
 
 export async function GET(request: NextRequest) {
@@ -86,7 +81,9 @@ export async function GET(request: NextRequest) {
   return runWithTenant(familyId, async () => {
     // The reminder targets a yahrzeit `lead` days from today (lead=1 → tomorrow,
     // i.e. the candle is lit this evening).
-    const today = startOfToday();
+    // The deployment's civil day, on a noon carrier (see zoned-day.ts) — not the
+    // process's local midnight, which a 00:00 DST shift can push to yesterday.
+    const today = civilDayInZone();
     const target = targetDateForLead(today, lead);
     const targetKey = ymd(target);
 

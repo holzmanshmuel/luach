@@ -1,9 +1,20 @@
 import { HDate, months, gematriya } from '@hebcal/core';
+import { civilDayFromParts, type CivilDay } from './civil-day';
 
 export interface HebrewMonthCell {
   hebrewDay: number;   // 1..30
   gematria: string;    // 'א׳' .. 'ל׳'
-  gregorian: Date;     // civil date this Hebrew day falls on
+  /**
+   * The civil day this Hebrew day falls on, `YYYY-MM-DD`.
+   *
+   * A string, not a `Date`, because the whole model is a prop of the CLIENT
+   * component `HebrewCalendarGrid`: a `Date` crossing that boundary keeps its
+   * instant and loses its calendar day, so the grid's `Sep 4` note, its "today"
+   * ring and its gathering lookup all shifted a day for any viewer west of
+   * Israel. Server code that needs a real `Date` (zmanim, holidays) converts with
+   * `civilDayToDate()` from `zoned-day.ts`.
+   */
+  ymd: CivilDay;
   weekday: number;     // 0=Sun .. 6=Sat
 }
 
@@ -41,7 +52,9 @@ export function buildHebrewMonth(
     days.push({
       hebrewDay: d,
       gematria: gematriya(d),
-      gregorian: greg,
+      // hebcal hands back a local-midnight Date; read its LOCAL fields (never
+      // toISOString) and freeze the answer as a string here, on the server.
+      ymd: civilDayFromParts(greg.getFullYear(), greg.getMonth() + 1, greg.getDate()),
       weekday: greg.getDay(),
     });
   }

@@ -11,6 +11,7 @@ import { EditPersonModal } from './EditPersonModal';
 import { useUserPrefs } from './UserPrefsContext';
 import { displayName } from '@/lib/names';
 import { branchStyle, isCatchAllBranch } from '@/lib/branches';
+import { backArrow, dirForLang } from '@/lib/direction';
 import Link from 'next/link';
 
 // ── Editable card for unlinked members ──────────────────────────────────────
@@ -55,7 +56,7 @@ export function FamilyTreeClient({
   spellings: BranchSpelling[];
 }) {
   const [highlight, setHighlight] = useState<string | null>(null);
-  const { t, canEdit, spell, branches } = useUserPrefs();
+  const { t, canEdit, spell, branches, language } = useUserPrefs();
 
   function toggleBranch(branch: string) {
     setHighlight(h => (h === branch ? null : branch));
@@ -67,7 +68,8 @@ export function FamilyTreeClient({
       <header className="bg-parchment-card border-b border-warm-border px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-y-3">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm text-ink-muted hover:text-ink transition-colors">
-            ← {t('nav.calendar')}
+            {/* Direction-chosen, not baked into the label — see lib/direction.ts. */}
+            <span aria-hidden>{backArrow(dirForLang(language))}</span> {t('nav.calendar')}
           </Link>
           <span className="text-warm-border">|</span>
           <div className="flex items-center gap-2">

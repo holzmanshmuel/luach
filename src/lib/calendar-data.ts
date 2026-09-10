@@ -1,5 +1,7 @@
 import { query } from '@/lib/db';
-import { hebrewToGregorian, hebrewToGregorianAll, formatHebrewDate, daysUntil, getNextOccurrence, yearsSince, yearsSinceForHebrewYear } from '@/lib/hebrew';
+import { hebrewToGregorian, hebrewToGregorianAll, formatHebrewDate, daysUntil, daysUntilCivilDay, getNextOccurrence, yearsSince, yearsSinceForHebrewYear } from '@/lib/hebrew';
+import { civilDayParts, civilYear } from '@/lib/civil-day';
+import { todayYmd, ymd } from '@/lib/zoned-day';
 import { EventWithMember, CalendarEvent, Gathering, FamilyTag } from '@/lib/types';
 import { getViewerSpelling, rewriteNames } from '@/lib/spellings';
 import { solarDateInYear } from '@/lib/solar';
@@ -7,7 +9,40 @@ import { months, type HebrewMonthModel } from '@/lib/hebrew-calendar';
 import { HDate } from '@hebcal/core';
 import { getT, type Lang } from '@/lib/translations';
 import { displayName } from '@/lib/names';
-import { formatHebrewDateLocalized, formatGregorianLocalized } from '@/lib/date-format';
+import { formatHebrewDateLocalized, formatCivilDayLocalized } from '@/lib/date-format';
+
+/**
+ * The one SELECT list every calendar loader shares — explicit, never `e.*`.
+ *
+ * Two reasons it is written out:
+ *
+ *  - **The timestamps come back as ISO TEXT.** `created_at`/`updated_at` are
+ *    `timestamptz`, and the pg driver hands those back as JS `Date` objects. These
+ *    rows are spread straight into `CalendarEvent`, which is a prop of client
+ *    components — so two `Date`s were crossing the server→client boundary behind a
+ *    type that declared `string`. Same bug class as `gregorianDate`, just quieter.
+ *  - **`family_id` is left out.** It is the tenant column, not part of `Event`, and
+ *    a client has no use for it.
+ *
+ * A new column on `events` that the app displays has to be added here.
+ */
+const EVENT_COLUMNS = `
+  e.id, e.family_member_id, e.event_type, e.event_type_label,
+  e.hebrew_day, e.hebrew_month, e.hebrew_year, e.gregorian_year,
+  e.original_english_date, e.note,
+  to_char(e.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+  to_char(e.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at
+`;
+
+/** Same, for the one-off gathering rows the grids and chips render. */
+const GATHERING_COLUMNS = `
+  id, title, kind,
+  to_char(gather_date, 'YYYY-MM-DD') AS gather_date,
+  to_char(gather_time, 'HH24:MI') AS gather_time,
+  location, description,
+  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+  to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at
+`;
 
 /**
  * The fixed Gregorian birthday (month/day) for a birthday row, so every birthday
@@ -39,7 +74,7 @@ export async function getEventsForMonth(
   month: number // 0-indexed
 ): Promise<CalendarEvent[]> {
   const rows = await query<EventWithMember>(`
-    SELECT e.*, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
+    SELECT ${EVENT_COLUMNS}, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
     FROM family_calendar.events e
     JOIN family_calendar.family_members fm ON e.family_member_id = fm.id
     ORDER BY fm.name
@@ -54,7 +89,11 @@ export async function getEventsForMonth(
       if (gregDate.getMonth() === month) {
         events.push({
           ...row,
-          gregorianDate: gregDate,
+          // The civil day is frozen to a string HERE, on the server, in the
+          // deployment's zone. A Date would keep only its instant across the
+          // server→client boundary and re-read a day early for any viewer west
+          // of Israel — see the note on CalendarEvent.gregorianDay.
+          gregorianDay: ymd(gregDate),
           hebrewDateDisplay: formatHebrewDate(row.hebrew_day, row.hebrew_month, row.hebrew_year),
           daysUntil: daysUntil(gregDate),
           dateType: 'hebrew',
@@ -70,7 +109,7 @@ export async function getEventsForMonth(
       if (fixedDate.getMonth() === month) {
         events.push({
           ...row,
-          gregorianDate: fixedDate,
+          gregorianDay: ymd(fixedDate),
           hebrewDateDisplay: formatHebrewDate(row.hebrew_day, row.hebrew_month, row.hebrew_year),
           daysUntil: daysUntil(fixedDate),
           dateType: 'gregorian',
@@ -85,25 +124,28 @@ export async function getEventsForMonth(
   // 19-year cycle), collapse the duplicate so the cell shows one chip, not two.
   const seen = new Set<string>();
   const deduped = events.filter(e => {
-    const key = `${e.id}-${e.event_type}-${e.gregorianDate.getDate()}`;
+    const key = `${e.id}-${e.event_type}-${e.gregorianDay}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  return deduped.sort((a, b) => a.gregorianDate.getDate() - b.gregorianDate.getDate());
+  // All these days are inside one month, so the YYYY-MM-DD strings sort exactly
+  // as the old day-of-month numbers did.
+  return deduped.sort((a, b) => (a.gregorianDay < b.gregorianDay ? -1 : a.gregorianDay > b.gregorianDay ? 1 : 0));
 }
 
 export async function getUpcomingEvents(limit = 10): Promise<CalendarEvent[]> {
   const rows = await query<EventWithMember>(`
-    SELECT e.*, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
+    SELECT ${EVENT_COLUMNS}, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
     FROM family_calendar.events e
     JOIN family_calendar.family_members fm ON e.family_member_id = fm.id
     ORDER BY fm.name
   `);
   rewriteNames(rows, await getViewerSpelling());
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // "Today" is the deployment's civil day, not the process's local midnight.
+  const todayKey = todayYmd();
+  const thisYear = civilYear(todayKey);
 
   const upcoming: CalendarEvent[] = [];
   for (const row of rows) {
@@ -112,7 +154,7 @@ export async function getUpcomingEvents(limit = 10): Promise<CalendarEvent[]> {
     if (next) {
       upcoming.push({
         ...row,
-        gregorianDate: next.gregorianDate,
+        gregorianDay: ymd(next.gregorianDate),
         hebrewDateDisplay: formatHebrewDate(row.hebrew_day, row.hebrew_month, row.hebrew_year),
         daysUntil: daysUntil(next.gregorianDate),
         dateType: 'hebrew',
@@ -123,19 +165,19 @@ export async function getUpcomingEvents(limit = 10): Promise<CalendarEvent[]> {
     // Gregorian occurrence — every birthday also appears on its fixed solar date
     const md = gregorianBirthMonthDay(row);
     if (md) {
-      const thisYear = today.getFullYear();
-      let candidate = solarDateInYear(thisYear, md.month, md.day);
-      if (candidate < today) {
-        candidate = solarDateInYear(thisYear + 1, md.month, md.day);
+      // Compared as civil-day STRINGS, so "already past" can't flip on a DST day.
+      let candidateDay = ymd(solarDateInYear(thisYear, md.month, md.day));
+      if (candidateDay < todayKey) {
+        candidateDay = ymd(solarDateInYear(thisYear + 1, md.month, md.day));
       }
       upcoming.push({
         ...row,
-        gregorianDate: candidate,
+        gregorianDay: candidateDay,
         hebrewDateDisplay: formatHebrewDate(row.hebrew_day, row.hebrew_month, row.hebrew_year),
-        daysUntil: daysUntil(candidate),
+        daysUntil: daysUntilCivilDay(candidateDay),
         dateType: 'gregorian',
         // The solar occurrence is the English birthday — count in Gregorian years.
-        yearsCount: row.gregorian_year ? candidate.getFullYear() - row.gregorian_year : null,
+        yearsCount: row.gregorian_year ? civilYear(candidateDay) - row.gregorian_year : null,
       });
     }
   }
@@ -145,9 +187,9 @@ export async function getUpcomingEvents(limit = 10): Promise<CalendarEvent[]> {
   // per 19-year cycle) so the same line never appears twice.
   const seen = new Set<string>();
   const deduped = upcoming
-    .sort((a, b) => a.gregorianDate.getTime() - b.gregorianDate.getTime())
+    .sort((a, b) => (a.gregorianDay < b.gregorianDay ? -1 : a.gregorianDay > b.gregorianDay ? 1 : 0))
     .filter(e => {
-      const key = `${e.id}-${e.event_type}-${e.gregorianDate.getFullYear()}-${e.gregorianDate.getMonth()}-${e.gregorianDate.getDate()}`;
+      const key = `${e.id}-${e.event_type}-${e.gregorianDay}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -183,7 +225,7 @@ export async function getEventsForHebrewMonth(
   model: HebrewMonthModel,
 ): Promise<CalendarEvent[]> {
   const rows = await query<EventWithMember>(`
-    SELECT e.*, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
+    SELECT ${EVENT_COLUMNS}, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
     FROM family_calendar.events e
     JOIN family_calendar.family_members fm ON e.family_member_id = fm.id
     ORDER BY fm.name
@@ -198,7 +240,8 @@ export async function getEventsForHebrewMonth(
   // false "Today!", a wrong "falls on" date, and a yahrzeit candle a day early).
   const hebDay = new Map<number, HebrewMonthModel['days'][number]>();
   for (const d of model.days) {
-    solarDay.set(`${d.gregorian.getMonth() + 1}-${d.gregorian.getDate()}`, d);
+    const parts = civilDayParts(d.ymd);
+    solarDay.set(`${parts.month}-${parts.day}`, d);
     hebDay.set(d.hebrewDay, d);
   }
   const lastHebDay = model.days.length ? model.days[model.days.length - 1].hebrewDay : 30;
@@ -209,12 +252,14 @@ export async function getEventsForHebrewMonth(
     // short month's last day, matching the grid). Attach that day's real civil date.
     if (monthLabels.includes(row.hebrew_month)) {
       const cell = hebDay.get(Math.min(row.hebrew_day, lastHebDay));
-      const greg = cell?.gregorian ?? new Date();
+      // No cell means the Hebrew day doesn't exist in this month at all; fall back
+      // to the deployment's today, matching the previous `new Date()` placeholder.
+      const greg = cell?.ymd ?? todayYmd();
       out.push({
         ...row,
-        gregorianDate: greg,
+        gregorianDay: greg,
         hebrewDateDisplay: formatHebrewDate(row.hebrew_day, row.hebrew_month, row.hebrew_year),
-        daysUntil: cell ? daysUntil(greg) : 0,
+        daysUntil: cell ? daysUntilCivilDay(greg) : 0,
         dateType: 'hebrew',
         yearsCount: yearsSinceForHebrewYear(hYear, row),
       });
@@ -229,11 +274,11 @@ export async function getEventsForHebrewMonth(
         out.push({
           ...row,
           gridDay: cell.hebrewDay, // place it on the Hebrew day the solar date falls on
-          gregorianDate: cell.gregorian,
+          gregorianDay: cell.ymd,
           hebrewDateDisplay: formatHebrewDate(row.hebrew_day, row.hebrew_month, row.hebrew_year),
-          daysUntil: daysUntil(cell.gregorian),
+          daysUntil: daysUntilCivilDay(cell.ymd),
           dateType: 'gregorian',
-          yearsCount: row.gregorian_year ? cell.gregorian.getFullYear() - row.gregorian_year : null,
+          yearsCount: row.gregorian_year ? civilYear(cell.ymd) - row.gregorian_year : null,
         });
       }
     }
@@ -259,7 +304,7 @@ export interface TimelineEntry {
 export async function fetchTimeline(lang: Lang): Promise<TimelineEntry[]> {
   const t = getT(lang);
   const rows = await query<EventWithMember>(`
-    SELECT e.*, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
+    SELECT ${EVENT_COLUMNS}, fm.name, fm.last_name, fm.name_he, fm.family_branch, fm.nickname, fm.photo_url
     FROM family_calendar.events e
     JOIN family_calendar.family_members fm ON e.family_member_id = fm.id
     WHERE e.gregorian_year IS NOT NULL OR e.original_english_date IS NOT NULL
@@ -283,8 +328,10 @@ export async function fetchTimeline(lang: Lang): Promise<TimelineEntry[]> {
   const entries: TimelineEntry[] = rows.flatMap(row => {
     const year = eventYear(row);
     if (year == null) return [];
+    // original_english_date is already a YYYY-MM-DD civil day (db.ts pins the DATE
+    // type parser to a string), so format it as one — no Date round-trip.
     const englishDate = row.original_english_date
-      ? formatGregorianLocalized(new Date(row.original_english_date + 'T12:00:00Z'), lang)
+      ? formatCivilDayLocalized(row.original_english_date, lang)
       : null;
 
     let ageOrLabel: string | null = null;
@@ -320,9 +367,7 @@ export async function fetchTimeline(lang: Lang): Promise<TimelineEntry[]> {
 
 export async function getGatheringsRaw(): Promise<Gathering[]> {
   return query<Gathering>(
-    `SELECT id, title, kind, to_char(gather_date, 'YYYY-MM-DD') AS gather_date,
-            to_char(gather_time, 'HH24:MI') AS gather_time, location, description,
-            created_at, updated_at
+    `SELECT ${GATHERING_COLUMNS}
      FROM family_calendar.gatherings
      ORDER BY gather_date, gather_time NULLS FIRST`
   );

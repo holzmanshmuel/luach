@@ -1,4 +1,5 @@
 import type { FamilyColor } from '@/lib/family-color';
+import type { CivilDay } from '@/lib/civil-day';
 
 /**
  * Internal event-type identifiers. NOTE the spelling split, deliberate and load-
@@ -109,7 +110,21 @@ export interface EventWithMember extends Event {
 }
 
 export interface CalendarEvent extends EventWithMember {
-  gregorianDate: Date;
+  /**
+   * The civil day this occurrence falls on, `YYYY-MM-DD` — **not a `Date`**.
+   *
+   * `CalendarEvent` is handed straight from Server Components into client ones
+   * (`CalendarGrid`, `HebrewCalendarGrid`, `UpcomingEvents`, `EventDetailModal`),
+   * and React's wire format preserves the *instant*, not the calendar day: a
+   * `Date` built here at local midnight in `TZ=Asia/Jerusalem` arrived in the
+   * browser as the previous evening UTC, so every relative outside Israel read
+   * `.getDate()` one day early. The day is therefore decided ONCE on the server
+   * (see `zoned-day.ts`) and travels as a string, which no clock can reinterpret.
+   *
+   * Use the pure helpers in `civil-day.ts` to read or shift it. Never
+   * `new Date(gregorianDay)` in a client component.
+   */
+  gregorianDay: CivilDay;
   hebrewDateDisplay: string;
   daysUntil: number;
   dateType: 'hebrew' | 'gregorian';

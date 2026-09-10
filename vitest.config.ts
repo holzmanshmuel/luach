@@ -14,7 +14,10 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // .tsx as well as .ts: the display-boundary tests render the real client
+    // components (see calendar-display.test.tsx) under several viewer timezones,
+    // which is the only place the server→client Date bug was ever visible.
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     // Nine test files talk to a real Postgres (tenant, users, tokens, feed-token,
     // combined, ical, subscribe, calendar.ics/route, broadcast-site-url). Unlike the
     // sibling torim repo, db.ts wraps each query() in its own BEGIN/COMMIT — there is

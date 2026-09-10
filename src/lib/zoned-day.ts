@@ -23,7 +23,14 @@
  *
  * Consequence: compare days by {@link ymd} string, never by `getTime()`, since a
  * caller may hand in a midnight-based Date (the legacy weekly digest does).
+ *
+ * ## A `Date` never leaves the server
+ *
+ * The carriers here are a server-side implementation detail. Anything crossing to
+ * a **client** component travels as a `CivilDay` (`YYYY-MM-DD`) — see
+ * `civil-day.ts` for why, and {@link todayYmd} for the deployment's today.
  */
+import { civilDayParts, type CivilDay } from './civil-day';
 
 /**
  * The zone this deployment reckons "today" in: `TZ` when set (Railway sets
@@ -82,6 +89,36 @@ export function civilDayInZone(
 /** Local `YYYY-MM-DD`. Never `toISOString()` — that shifts by the TZ offset. */
 export function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * **The deployment's today, as a `CivilDay` string** — the one value every page
+ * should hand its client components instead of letting the browser call
+ * `new Date()`.
+ *
+ * A relative in Los Angeles or Auckland computing "today" in their own browser
+ * sees the "today" highlight on a different cell than the family's actual current
+ * day; worse, the day itself would be re-derived from a serialised instant. This
+ * decides it once, on the server, in `TZ` — and a string cannot be re-interpreted.
+ *
+ * @see civilDayInZone for the carrier form, and `civil-day.ts` for the string type.
+ */
+export function todayYmd(
+  at: Date = new Date(),
+  timeZone: string = deploymentTimeZone()
+): CivilDay {
+  return ymd(civilDayInZone(at, timeZone));
+}
+
+/**
+ * A `YYYY-MM-DD` string back to a civil-date CARRIER (local noon — see the module
+ * note), for the server-side code that genuinely needs a `Date`: hebcal's
+ * `HDate`, the zmanim calculations, range comparisons. Never for a client
+ * component — those take the string.
+ */
+export function civilDayToDate(day: CivilDay): Date {
+  const { year, month, day: d } = civilDayParts(day);
+  return new Date(year, month - 1, d, 12, 0, 0, 0);
 }
 
 /** `days` calendar days after (or before) a civil-date carrier. */

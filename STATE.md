@@ -55,6 +55,70 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Log
 
+### 2026-09-10 — every relative outside Israel saw every date a day early
+
+- **The same off-by-one bug class, third disguise: a `Date` crossing the server→client
+  boundary.** `CalendarEvent.gregorianDate` was a real `Date`, built on the server (which
+  runs `TZ=Asia/Jerusalem`) at local midnight and passed as a prop into CLIENT components,
+  which called `.getDate()` / `.getMonth()` on it. React's wire format preserves the
+  INSTANT, not the civil day: 4 Sep 2026 serialised as `2026-09-03T21:00:00.000Z` and the
+  browser read it in the VIEWER's zone — Thu 3 Sept in London, New York and Los Angeles.
+  **Every birthday, anniversary and yahrzeit was a day early for every relative outside
+  Israel.** Same shape as the `toISOString()` bug that once wrote 38 birthdays a day early.
+- 🪤 **The pure-function suite could not see it, and never could have.** The bug lived at a
+  PROCESS BOUNDARY, not inside a function; every conversion test was already timezone-clean
+  and passing. When a suite is green and the screen is wrong, ask what crosses a boundary.
+- **The fix: the civil day is decided ONCE, on the server, in `TZ`, and travels as a
+  `YYYY-MM-DD` string.** New `src/lib/civil-day.ts` (`CivilDay`, pure UTC/string arithmetic,
+  client-safe) is the type; `zoned-day.ts` gained `todayYmd()` and `civilDayToDate()` as the
+  two crossings. `CalendarEvent.gregorianDate: Date` → `gregorianDay: CivilDay`, and
+  `HebrewMonthCell.gregorian: Date` → `ymd: CivilDay` (the whole month model is a client
+  prop too — its "today" ring, its `Sep 4` note and its gathering lookup all read from it).
+- **"Today" is the DEPLOYMENT's today.** `CalendarGrid`, `HebrewCalendarGrid` and `MonthNav`
+  each called a bare `new Date()` IN THE BROWSER, so a relative in Auckland saw the
+  highlight on tomorrow's cell. `page.tsx` now resolves it once and passes `todayDay` down.
+- 🪤 **The shape guard found a second one nobody was looking for:** `created_at`/`updated_at`
+  are `timestamptz`, so the pg driver hands them back as `Date` objects — behind a type that
+  declared `string`, spread straight into a client prop. The calendar loaders now share an
+  explicit `EVENT_COLUMNS` / `GATHERING_COLUMNS` list that returns them as ISO text (and
+  drops `family_id`). **`e.*` is how a new column silently becomes a new client prop.**
+- `formatGregorianLocalized(date, lang)` is **deleted**, not deprecated — a `Date`-taking day
+  formatter is the loaded gun. `formatCivilDayLocalized` / `formatCivilDayShort` take the
+  string and pin `Intl` to `timeZone: 'UTC'`, so the sentence is identical in every zone.
+- `/api/digest/week` and `/api/reminders/yahrzeit` moved off their own local-midnight
+  `startOfToday()` onto `civilDayInZone()`, and `digest.ts` rehydrates a gathering date as a
+  noon carrier. **Output is byte-identical** — checked field by field over 25,550
+  (instant, zone) pairs across 5 zones, and `broadcast-site-url.test.ts` still passes.
+- **New tests are about SHAPE and about the READER's zone, not another conversion.**
+  `calendar-boundary.test.ts` (DB-backed) walks everything the loaders return and fails on
+  any `Date` instance anywhere in it; `calendar-display.test.tsx` renders the real client
+  components under 7 viewer zones and diffs the markup. Reintroducing the old `CalendarGrid`
+  behaviour fails 4 of them. `vitest.config.ts` now includes `*.test.tsx`.
+- Suite: **46 files / 583 tests, 0 skipped**, green under `TZ=` Asia/Jerusalem, UTC,
+  America/Los_Angeles, Pacific/Auckland and Asia/Kolkata. Verified in a real browser
+  (production build) with the browser zone overridden: identical dates in all of them.
+
+### 2026-09-10 — the month-nav chevrons are bidi-MIRRORED, and that is the actual hazard
+
+- ⚠ **`‹` and `›` (U+2039/U+203A) have `Bidi_Mirrored = Yes`.** Measured from rendered
+  pixels in Chrome: inside `dir="rtl"`, `‹` PAINTS as `›` and `›` PAINTS as `‹`. `←`/`→`
+  (U+2190/U+2192) were measured the same way and are **not** mirrored.
+- **So an audit that reads the DOM text gets the Hebrew nav exactly backwards.** One
+  reported the chevrons inverted (right-hand "next month" button showing a left glyph); at
+  the pixel level the original was CORRECT, and "fixing" the code points would have
+  inverted what people actually see. **Read pixels, not code points, for a mirrored glyph.**
+- The fix is to stop depending on the mirror at all: every chevron link carries
+  `CHEVRON_BIDI` (`dir="ltr"`) from the new `src/lib/direction.ts`, which isolates the run so
+  the source glyph IS the painted glyph in both languages. `flexRowChevron(dir, index)` then
+  picks the glyph by DOM POSITION — a `dir="rtl"` flex row starts at the RIGHT, so the
+  Hebrew nav's first child is its right-hand button.
+- `direction.ts` also owns `backArrow(dir)`; `/tree`, `/timeline` and `/admin/access` now use
+  it instead of a hard-coded `←`. A source guard in `direction.test.ts` fails if any
+  direction-sensitive component contains a literal arrow or chevron, and a second one fails
+  if a month-nav chevron link loses its `dir="ltr"`.
+- Subscribe dialog: the calendar-URL `<input>` gained `dir="ltr"`, so the Hebrew page no
+  longer right-aligns it and truncates the START of the link.
+
 ### 2026-09-10 — a new family must never inherit the operator's surnames
 
 - **The v14 fallback chain leaked one tenant's PII into every other.** `NULL branches`

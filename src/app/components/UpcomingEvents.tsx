@@ -8,6 +8,7 @@ import { Avatar } from './Avatar';
 import { displayName } from '@/lib/names';
 import { formatHebrewDateLocalized } from '@/lib/date-format';
 import { countLabel } from '@/lib/event-phrase';
+import { civilDayOfMonth, civilMonthIndex } from '@/lib/civil-day';
 
 const EVENT_ICONS: Record<string, string> = {
   birthday:    '🎂',
@@ -39,7 +40,11 @@ export function UpcomingEvents({ events }: { events: CalendarEvent[] }) {
   function renderItem(event: CalendarEvent) {
     const isHebrew = event.dateType === 'hebrew';
     const name = displayName(event, language, showNicknames);
-    const monthKey = `months.short.${event.gregorianDate.getMonth()}`;
+    // Month and day come off the server-decided civil-day string. Reading them
+    // from a Date here answered in the VIEWER's zone, which put every occasion in
+    // the wrong badge (and the wrong month at a month boundary) outside Israel.
+    const monthKey = `months.short.${civilMonthIndex(event.gregorianDay)}`;
+    const dayOfMonth = civilDayOfMonth(event.gregorianDay);
     const ageLabel = countLabel(event.event_type, event.yearsCount, language);
 
     // Combined (merged) view only — which family this occurrence belongs to.
@@ -59,7 +64,7 @@ export function UpcomingEvents({ events }: { events: CalendarEvent[] }) {
             {t(monthKey)}
           </div>
           <div className="text-lg font-bold text-ink leading-tight font-display">
-            {event.gregorianDate.getDate()}
+            {dayOfMonth}
           </div>
         </div>
 
@@ -83,7 +88,7 @@ export function UpcomingEvents({ events }: { events: CalendarEvent[] }) {
           <div className={`text-[11px] mt-0.5 ${isHebrew ? 'text-accent-ink' : 'text-ink-muted'}`}>
             {isHebrew
               ? `✡ ${formatHebrewDateLocalized(event.hebrew_day, event.hebrew_month, event.hebrew_year, language)}`
-              : `📅 ${t(monthKey)} ${event.gregorianDate.getDate()}`
+              : `📅 ${t(monthKey)} ${dayOfMonth}`
             }
           </div>
           {event.family && (

@@ -1,4 +1,6 @@
 import { HDate, months } from '@hebcal/core';
+import { civilDaysBetween, civilYear, type CivilDay } from './civil-day';
+import { todayYmd, ymd } from './zoned-day';
 
 // Months whose identity is independent of leap years.
 const FIXED_MONTH_TO_NUM: Record<string, number> = {
@@ -101,19 +103,21 @@ export function getNextOccurrence(
   day: number,
   month: string
 ): { gregorianDate: Date; hebrewYear: number } | null {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // "Today" is the deployment's civil day (TZ), compared as a YYYY-MM-DD string —
+  // never a getTime() against a midnight Date, which a DST shift can invert.
+  const todayKey = todayYmd();
+  const thisYear = civilYear(todayKey);
 
   // Gather every occurrence across this civil year and next (a Hebrew date can
   // occur twice in a civil year), then take the earliest one that's today or
   // later — otherwise a late-December date would be skipped for its January twin.
   const candidates: Date[] = [];
   for (let yearOffset = 0; yearOffset <= 1; yearOffset++) {
-    candidates.push(...hebrewToGregorianAll(day, month, today.getFullYear() + yearOffset));
+    candidates.push(...hebrewToGregorianAll(day, month, thisYear + yearOffset));
   }
   const next = candidates
-    .filter(d => d >= today)
-    .sort((a, b) => a.getTime() - b.getTime())[0];
+    .filter(d => ymd(d) >= todayKey)
+    .sort((a, b) => (ymd(a) < ymd(b) ? -1 : ymd(a) > ymd(b) ? 1 : 0))[0];
   if (!next) return null;
   // Derive the Hebrew year from the resulting date rather than a fixed offset
   // (which is off-by-one for Tevet–Adar, which fall in Jan–Mar).
@@ -234,12 +238,22 @@ export function yearsSince(occurrenceGreg: Date, birth: BirthLike): number | nul
 }
 
 /**
- * Calculate days until a given date from today (negative if in the past).
+ * Whole calendar days from **the deployment's today** to `day` (negative in the
+ * past).
+ *
+ * Both ends are civil DAYS, not instants. Two things follow, and both were bugs
+ * waiting to happen in the previous `setHours(0,0,0,0)` subtraction:
+ *
+ *  - "Today" is the day it is in `TZ` (`civilDayInZone`), not in whatever zone
+ *    the process happens to boot with — the same rule the digest feeds follow.
+ *  - The difference is counted in calendar days, so a DST transition inside the
+ *    interval cannot turn 7 days into 6.96 and round the wrong way.
  */
+export function daysUntilCivilDay(day: CivilDay): number {
+  return civilDaysBetween(todayYmd(), day);
+}
+
+/** As {@link daysUntilCivilDay}, for the server-side code still holding a Date. */
 export function daysUntil(date: Date): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return daysUntilCivilDay(ymd(date));
 }

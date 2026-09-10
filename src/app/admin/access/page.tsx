@@ -6,6 +6,7 @@ import { listInviteTokens } from '@/lib/tokens';
 import { AccessAdminPanel, type InvitePanelLabels } from './AccessAdminPanel';
 import { requireAdmin } from '@/lib/auth';
 import { getT, type Lang } from '@/lib/translations';
+import { backArrow, dirForLang } from '@/lib/direction';
 
 export default async function AccessAdminPage() {
   // /admin/* is coarse-gated to owners by the proxy; requireAdmin re-verifies the
@@ -16,7 +17,7 @@ export default async function AccessAdminPage() {
   const cookieStore = await cookies();
   const lang: Lang = cookieStore.get('lang')?.value === 'he' ? 'he' : 'en';
   const t = getT(lang);
-  const dir = lang === 'he' ? 'rtl' : 'ltr';
+  const dir = dirForLang(lang);
 
   const invites = await listInviteTokens();
 
@@ -55,7 +56,7 @@ export default async function AccessAdminPage() {
             translated label: 'invite.back' used to ship a literal '← ' that pointed
             the wrong way on the Hebrew page. */}
         <Link href="/" className="text-xs text-ink-muted hover:text-ink flex items-center gap-1">
-          <span aria-hidden>{dir === 'rtl' ? '→' : '←'}</span>
+          <span aria-hidden>{backArrow(dir)}</span>
           {t('invite.back')}
         </Link>
       </header>

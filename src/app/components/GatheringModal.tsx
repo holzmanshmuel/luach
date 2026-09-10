@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { Gathering, GatheringKind, GATHERING_KINDS, GATHERING_KIND_ICON, FamilyTag } from '@/lib/types';
 import { Modal, fieldLabel, fieldInput, btnPrimary, btnGhost } from './Modal';
 import { useUserPrefs } from './UserPrefsContext';
-import { formatGregorianLocalized } from '@/lib/date-format';
+import { formatCivilDayLocalized } from '@/lib/date-format';
 import {
   createGatheringAction,
   updateGatheringAction,
@@ -142,10 +142,10 @@ export function GatheringModal({ mode, gathering, onClose, open: openProp, contr
                 <div className="flex-1">
                   <div className={fieldLabel}>{t('gathering.date_label')}</div>
                   <div className="text-sm text-ink">
-                    {(() => {
-                      const [gy, gm, gd] = gathering.gather_date.split('-').map(Number);
-                      return formatGregorianLocalized(new Date(gy, gm - 1, gd), language);
-                    })()}
+                    {/* gather_date is already a YYYY-MM-DD civil day (to_char in
+                        SQL) — format it as one. Round-tripping it through a
+                        browser Date is how a calendar day acquires a timezone. */}
+                    {formatCivilDayLocalized(gathering.gather_date, language)}
                   </div>
                 </div>
                 {gathering.gather_time && (
