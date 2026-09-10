@@ -276,6 +276,17 @@ async function main() {
     console.log('');
     console.log('Review warnings above and add those entries manually through the web app.');
   }
+  // A parsed cell is not a correct cell. Every row here carries TWO hand-typed
+  // dates — a Hebrew one and an English one — and this script has no way to know
+  // that they describe the same day: both halves parse fine when one of them is a
+  // typo, and the wrong date then shows on the calendar forever. The app
+  // cross-converts them and lists the contradictions; run it now, while the
+  // spreadsheet is still open in front of you.
+  console.log('');
+  console.log('NEXT: sign in as the family owner and open  /admin/dates  ("Date check").');
+  console.log('      It converts each event\'s Hebrew date to its English date and back,');
+  console.log('      and lists any that disagree by more than the nightfall day — those are');
+  console.log('      typos in the spreadsheet, not import failures, so they arrive silently.');
 }
 
 main().catch(err => {

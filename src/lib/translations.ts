@@ -9,6 +9,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'nav.convert': 'Convert dates',
     'nav.access': 'Access',
     'nav.hebrew_names': 'Hebrew Names',
+    'nav.date_check': 'Date check',
     'nav.subscribe': 'Subscribe',
     'nav.signout': 'Sign out',
     // Family switcher
@@ -367,6 +368,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'nav.convert': 'המרת תאריכים',
     'nav.access': 'גישה',
     'nav.hebrew_names': 'שמות עברית',
+    'nav.date_check': 'בדיקת תאריכים',
     'nav.subscribe': 'הרשמה',
     'nav.signout': 'התנתקות',
     // Family switcher

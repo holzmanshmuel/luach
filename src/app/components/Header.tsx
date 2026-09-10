@@ -64,6 +64,15 @@ export function Header({
             <span aria-hidden>א</span><span className="hidden sm:inline">{t('nav.hebrew_names')}</span>
           </Link>
         )}
+        {isAdmin && (
+          <Link
+            href="/admin/dates"
+            className="label hover:text-ink flex items-center gap-1.5 transition-colors"
+            title={t('nav.date_check')}
+          >
+            <span aria-hidden>🩺</span><span className="hidden sm:inline">{t('nav.date_check')}</span>
+          </Link>
+        )}
         <SubscribeModal label={t('nav.subscribe')} />
         {/* Plain <a>, NOT <Link>: Next prefetches <Link> hrefs, and prefetching
             this destructive GET endpoint silently logs the user out on page load. */}
