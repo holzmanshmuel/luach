@@ -6,6 +6,7 @@ import {
   heYearLabel,
 } from './hebrew-calendar';
 import { months } from '@hebcal/core';
+import { civilWeekday, isCivilDay } from './civil-day';
 
 describe('buildHebrewMonth — Sivan 5786', () => {
   const m = buildHebrewMonth(months.SIVAN, 5786);
@@ -23,7 +24,25 @@ describe('buildHebrewMonth — Sivan 5786', () => {
     const d25 = m.days[24];
     expect(d25.hebrewDay).toBe(25);
     expect(d25.gematria).toBe('כ״ה');
-    expect(d25.gregorian instanceof Date).toBe(true);
+    // A civil-day STRING, never a Date: the whole model is a prop of the client
+    // component HebrewCalendarGrid, and a Date crossing that boundary keeps its
+    // instant and loses its calendar day (a day early west of Israel).
+    expect(d25.ymd).toBe('2026-06-10');
+    expect(isCivilDay(d25.ymd)).toBe(true);
+  });
+
+  it('carries no Date anywhere in the model', () => {
+    // The shape guard: nothing in a HebrewMonthModel may be a Date instance, so
+    // there is nothing for a viewer's clock to reinterpret.
+    for (const d of m.days) {
+      for (const [key, value] of Object.entries(d)) {
+        expect(value instanceof Date, `days[].${key} is a Date`).toBe(false);
+      }
+    }
+  });
+
+  it('each cell\'s weekday agrees with its own civil day', () => {
+    for (const d of m.days) expect(d.weekday).toBe(civilWeekday(d.ymd));
   });
 
   it('renders 15 as ט״ו (not י״ה)', () => {

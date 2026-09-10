@@ -1,5 +1,7 @@
 import { HebrewCalendar, flags } from '@hebcal/core';
 import { buildHebrewMonth } from './hebrew-calendar';
+import { civilDayFromParts } from './civil-day';
+import { civilDayToDate } from './zoned-day';
 
 export interface HolidayInfo {
   /** English name, e.g. "Rosh Hashana" */
@@ -92,23 +94,24 @@ export function getHolidaysForHebrewMonth(
   hebrewYear: number
 ): Record<number, HolidayInfo> {
   const model = buildHebrewMonth(hebrewMonth, hebrewYear);
-  const start = model.days[0].gregorian;
-  const end = model.days[model.days.length - 1].gregorian;
+  // The model now carries civil DAYS, not Dates; hebcal still wants real ones, so
+  // rehydrate noon carriers (noon exists in every zone on every day, unlike
+  // midnight — see zoned-day.ts).
+  const start = civilDayToDate(model.days[0].ymd);
+  const end = civilDayToDate(model.days[model.days.length - 1].ymd);
   const ilYomTov = israelYomTovDates(start, end);
   const events = HebrewCalendar.calendar({ start, end, il: false }) as HebEvent[];
 
-  // Map each civil date -> hebrew day for this month.
-  const dayByTime = new Map<number, number>();
-  for (const c of model.days) {
-    const k = new Date(c.gregorian.getFullYear(), c.gregorian.getMonth(), c.gregorian.getDate()).getTime();
-    dayByTime.set(k, c.hebrewDay);
-  }
+  // Map each civil day -> hebrew day for this month. Keyed by the YYYY-MM-DD
+  // string rather than a midnight getTime(), so a DST transition cannot make two
+  // different days hash to the same instant (or a day miss its own key).
+  const dayByCivilDay = new Map<string, number>();
+  for (const c of model.days) dayByCivilDay.set(c.ymd, c.hebrewDay);
 
   const out: Record<number, HolidayInfo> = {};
   for (const ev of events) {
     const g = ev.getDate().greg();
-    const k = new Date(g.getFullYear(), g.getMonth(), g.getDate()).getTime();
-    const hd = dayByTime.get(k);
+    const hd = dayByCivilDay.get(civilDayFromParts(g.getFullYear(), g.getMonth() + 1, g.getDate()));
     if (hd === undefined) continue;
     out[hd] = preferred(out[hd], infoFromEvent(ev, ilYomTov));
   }

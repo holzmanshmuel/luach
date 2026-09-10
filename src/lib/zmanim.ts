@@ -1,5 +1,7 @@
 import { HebrewCalendar, Location, type Event } from '@hebcal/core';
 import type { HebrewMonthModel } from './hebrew-calendar';
+import { civilDayFromParts } from './civil-day';
+import { civilDayToDate } from './zoned-day';
 
 /**
  * Candle-lighting & havdalah times for the calendar.
@@ -82,8 +84,10 @@ export function getZmanimForHebrewMonth(
   location: Location = JERUSALEM,
 ): Record<number, DayZmanim> {
   if (!model.days.length) return {};
-  const start = model.days[0].gregorian;
-  const end = model.days[model.days.length - 1].gregorian;
+  // The model carries civil DAYS (strings); hebcal wants Dates, so rehydrate noon
+  // carriers — see zoned-day.ts for why noon and not midnight.
+  const start = civilDayToDate(model.days[0].ymd);
+  const end = civilDayToDate(model.days[model.days.length - 1].ymd);
   const events = HebrewCalendar.calendar({
     start,
     end,
@@ -92,21 +96,15 @@ export function getZmanimForHebrewMonth(
     il: location.getIsrael(),
   });
 
-  const dayByTime = new Map<number, number>();
-  for (const c of model.days) {
-    const k = new Date(
-      c.gregorian.getFullYear(),
-      c.gregorian.getMonth(),
-      c.gregorian.getDate(),
-    ).getTime();
-    dayByTime.set(k, c.hebrewDay);
-  }
+  // Keyed by YYYY-MM-DD rather than a midnight getTime(): a string key cannot be
+  // moved by a DST transition.
+  const dayByCivilDay = new Map<string, number>();
+  for (const c of model.days) dayByCivilDay.set(c.ymd, c.hebrewDay);
 
   const out: Record<number, DayZmanim> = {};
   for (const ev of events) {
     const g = ev.getDate().greg();
-    const k = new Date(g.getFullYear(), g.getMonth(), g.getDate()).getTime();
-    const hd = dayByTime.get(k);
+    const hd = dayByCivilDay.get(civilDayFromParts(g.getFullYear(), g.getMonth() + 1, g.getDate()));
     if (hd === undefined) continue;
     const t = timeStr(ev);
     if (!t) continue;

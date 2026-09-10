@@ -7,8 +7,9 @@ import { Avatar } from './Avatar';
 import { Modal } from './Modal';
 import { eventStyle } from '@/lib/event-style';
 import { displayName } from '@/lib/names';
-import { formatHebrewDateLocalized, formatGregorianLocalized } from '@/lib/date-format';
+import { formatHebrewDateLocalized, formatCivilDayLocalized } from '@/lib/date-format';
 import { countLabel } from '@/lib/event-phrase';
+import { addCivilDays } from '@/lib/civil-day';
 
 interface Props {
   event: CalendarEvent;
@@ -39,8 +40,10 @@ export function EventDetailModal({ event, onClose }: Props) {
   // The Nth count for birthdays/anniversaries (yahrzeit has its own memorial pack
   // below). e.g. "9th birthday" / "יום הולדת 9".
   const ageLabel = isYahrzeit ? null : countLabel(event.event_type, event.yearsCount, language);
-  const eveBefore = new Date(event.gregorianDate);
-  eveBefore.setDate(eveBefore.getDate() - 1);
+  // The evening before, stepped on the civil-day STRING. A `new Date(...)` +
+  // `setDate(-1)` walk here read the occurrence in the viewer's zone (already a
+  // day early outside Israel) and could slip a second day across a DST change.
+  const eveBefore = addCivilDays(event.gregorianDay, -1);
   const ordEn = (n: number) => {
     const m100 = n % 100;
     if (m100 >= 11 && m100 <= 13) return `${n}th`;
@@ -96,7 +99,7 @@ export function EventDetailModal({ event, onClose }: Props) {
             <div>
               <div className="label mb-0.5">{t('detail.falls_on')}</div>
               <div className="text-sm text-ink-muted">
-                {formatGregorianLocalized(event.gregorianDate, language)}
+                {formatCivilDayLocalized(event.gregorianDay, language)}
               </div>
             </div>
           </>
@@ -105,7 +108,7 @@ export function EventDetailModal({ event, onClose }: Props) {
             <div>
               <div className="label mb-0.5">{t('detail.english_date')}</div>
               <div className="font-display text-lg text-ink">
-                {formatGregorianLocalized(event.gregorianDate, language)}
+                {formatCivilDayLocalized(event.gregorianDay, language)}
               </div>
             </div>
             <div>
@@ -139,7 +142,7 @@ export function EventDetailModal({ event, onClose }: Props) {
             </span>
           </div>
           <p className="text-xs text-ink-muted leading-relaxed">
-            {t('yahrzeit.candle').replace('{date}', formatGregorianLocalized(eveBefore, language))}
+            {t('yahrzeit.candle').replace('{date}', formatCivilDayLocalized(eveBefore, language))}
           </p>
         </div>
       )}

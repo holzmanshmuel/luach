@@ -26,6 +26,8 @@ import {
 import { resolveViewFamilies, mapAcrossFamilies, tagWith } from '@/lib/combined';
 import { familyLabel } from '@/lib/family-label';
 import type { CalendarEvent, FamilyTag, Gathering } from '@/lib/types';
+import { civilDayInZone, todayYmd } from '@/lib/zoned-day';
+import { civilMonthIndex, civilYear } from '@/lib/civil-day';
 import { cookies } from 'next/headers';
 
 /** Parse a numeric URL param, falling back to a default if missing/NaN/out-of-range. */
@@ -92,9 +94,16 @@ export default async function Home({
     ? familyLabel(lang, joinedFamily.family_name, joinedFamily.family_name_he)
     : null;
 
+  // ── "Today", decided ONCE, here, in the deployment's timezone ──
+  // Every grid and nav below is a CLIENT component; each used to call `new Date()`
+  // in the browser, so a relative in Auckland saw the highlight on tomorrow's cell
+  // and one in Los Angeles on yesterday's. It travels down as a YYYY-MM-DD string,
+  // which no clock can reinterpret.
+  const todayDay = todayYmd();
+
   // ── Hebrew mode: Hebrew-month grid ──
   if (lang === 'he') {
-    const todayHeb = getHebrewMonthForGregorian(new Date());
+    const todayHeb = getHebrewMonthForGregorian(civilDayInZone());
     const hMonth = intParam(params.hmonth, todayHeb.hebrewMonth, 1, 13);
     const hYear = intParam(params.hyear, todayHeb.hebrewYear, 5000, 6000);
     const model = buildHebrewMonth(hMonth, hYear);
@@ -108,7 +117,7 @@ export default async function Home({
       }));
       hebEvents = bundles.flatMap(b => b.events);
       upcomingAll = bundles.flatMap(b => b.upcoming)
-        .sort((a, b) => a.gregorianDate.getTime() - b.gregorianDate.getTime());
+        .sort((a, b) => (a.gregorianDay < b.gregorianDay ? -1 : a.gregorianDay > b.gregorianDay ? 1 : 0));
       gatherings = bundles.flatMap(b => b.gatherings);
     } else {
       [hebEvents, upcomingAll, gatherings] = await Promise.all([
@@ -143,9 +152,9 @@ export default async function Home({
               {joinedLabel && <JoinedBanner lang={lang} familyLabel={joinedLabel} />}
               <WelcomeBanner />
               <OnThisDay events={upcomingAll} />
-              <MonthNav hebrew={{ model, hMonth, hYear, isCurrent: hMonth === todayHeb.hebrewMonth && hYear === todayHeb.hebrewYear }} />
+              <MonthNav todayDay={todayDay} hebrew={{ model, hMonth, hYear, isCurrent: hMonth === todayHeb.hebrewMonth && hYear === todayHeb.hebrewYear }} />
               <CalendarLegend />
-              <HebrewCalendarGrid model={model} events={hebEvents} gatherings={gatherings} holidays={holidays} zmanim={zmanim} />
+              <HebrewCalendarGrid model={model} events={hebEvents} gatherings={gatherings} holidays={holidays} zmanim={zmanim} todayDay={todayDay} />
             </div>
             <aside className="w-full lg:w-72 shrink-0">
               <UpcomingEvents events={upcomingAll.slice(0, 10)} />
@@ -157,9 +166,10 @@ export default async function Home({
   }
 
   // ── English mode: Gregorian-month grid (unchanged baseline) ──
-  const today = new Date();
-  const year = intParam(params.year, today.getFullYear(), 1900, 2200);
-  const month = intParam(params.month, today.getMonth(), 0, 11);
+  // The default month is the deployment's current one — read off `todayDay`, not
+  // a fresh `new Date()`, so the page and its "today" ring never disagree.
+  const year = intParam(params.year, civilYear(todayDay), 1900, 2200);
+  const month = intParam(params.month, civilMonthIndex(todayDay), 0, 11);
 
   let events: CalendarEvent[], upcomingAll: CalendarEvent[], gatherings: Gathering[];
   if (combined) {
@@ -170,7 +180,7 @@ export default async function Home({
     }));
     events = bundles.flatMap(b => b.events);
     upcomingAll = bundles.flatMap(b => b.upcoming)
-      .sort((a, b) => a.gregorianDate.getTime() - b.gregorianDate.getTime());
+      .sort((a, b) => (a.gregorianDay < b.gregorianDay ? -1 : a.gregorianDay > b.gregorianDay ? 1 : 0));
     gatherings = bundles.flatMap(b => b.gatherings);
   } else {
     [events, upcomingAll, gatherings] = await Promise.all([
@@ -204,9 +214,9 @@ export default async function Home({
             {joinedLabel && <JoinedBanner lang={lang} familyLabel={joinedLabel} />}
             <WelcomeBanner />
             <OnThisDay events={nextThirtyDaysEvents} />
-            <MonthNav year={year} month={month} />
+            <MonthNav year={year} month={month} todayDay={todayDay} />
             <CalendarLegend />
-            <CalendarGrid year={year} month={month} events={events} gatherings={gatherings} holidays={holidays} zmanim={zmanim} />
+            <CalendarGrid year={year} month={month} events={events} gatherings={gatherings} holidays={holidays} zmanim={zmanim} todayDay={todayDay} />
           </div>
           <aside className="w-full lg:w-72 shrink-0">
             <UpcomingEvents events={upcomingEvents} />

@@ -19,7 +19,7 @@ import { fullName } from './names';
 import { oneLine } from './text';
 import { ordinal } from './event-phrase';
 import { solarDateInYear } from './solar';
-import { ymd } from './zoned-day';
+import { civilDayToDate, ymd } from './zoned-day';
 
 /** The event-joined-to-member row shape the broadcast feeds select. */
 export interface DigestEventRow extends EventWithMember {
@@ -209,8 +209,12 @@ export function collectItems(opts: CollectItemsOptions): DigestItem[] {
   }
 
   for (const g of gatherings) {
-    const [gy, gm, gd] = g.gather_date.split('-').map(Number);
-    const on = new Date(gy, gm - 1, gd);
+    // gather_date is a 'YYYY-MM-DD' civil day (to_char in SQL). Rehydrate it as a
+    // local-NOON carrier via the shared helper, not `new Date(y, m, d)`: midnight
+    // does not exist on a spring-forward day in a zone that shifts at 00:00, and
+    // the constructor then lands on the previous date. Same ymd() output either way
+    // in Asia/Jerusalem — this is about not depending on that.
+    const on = civilDayToDate(g.gather_date);
     const date = ymd(on);
     if (!inWindow(date)) continue;
     const key = `gathering-${g.id}`;

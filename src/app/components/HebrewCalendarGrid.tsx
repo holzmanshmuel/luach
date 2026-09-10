@@ -5,6 +5,8 @@ import { DayEvents } from './DayEvents';
 import { GatheringChip } from './GatheringChip';
 import { useUserPrefs } from './UserPrefsContext';
 import type { HebrewMonthModel } from '@/lib/hebrew-calendar';
+import { formatCivilDayShort } from '@/lib/date-format';
+import type { CivilDay } from '@/lib/civil-day';
 
 const HE_DOW = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
@@ -14,16 +16,21 @@ export function HebrewCalendarGrid({
   gatherings = [],
   holidays,
   zmanim,
+  todayDay,
 }: {
   model: HebrewMonthModel;
   events: CalendarEvent[]; // already filtered to this Hebrew month
   gatherings?: Gathering[];
   holidays?: Record<number, { name: string; yomTov: boolean; chutzLaaretz?: boolean }>;
   zmanim?: Record<number, { candle?: string; havdalah?: string }>;
+  /**
+   * Today, as the DEPLOYMENT reckons it (`YYYY-MM-DD`, decided on the server) —
+   * not `new Date()` in the browser, which rings a different cell for a relative
+   * in Los Angeles than for one in Jerusalem.
+   */
+  todayDay: CivilDay;
 }) {
   const { t } = useUserPrefs();
-  const today = new Date();
-  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
 
   // Group events by hebrew_day. Clamp day-30 events onto the last day of a short
   // month (e.g. 30 Cheshvan in a 29-day Cheshvan year) so they don't silently
@@ -37,12 +44,12 @@ export function HebrewCalendarGrid({
     (byDay[day] ??= []).push(e);
   }
 
-  // Gatherings are Gregorian-dated; key them by 'YYYY-MM-DD' to match each cell's
-  // Gregorian date.
+  // Gatherings are Gregorian-dated; both sides are already 'YYYY-MM-DD' strings
+  // (gather_date comes out of Postgres via to_char, and each cell carries the
+  // civil day the server resolved), so this is a plain string match — no Date,
+  // no clock, nothing for a viewer's zone to shift.
   const gatheringsByDate: Record<string, Gathering[]> = {};
   for (const g of gatherings) (gatheringsByDate[g.gather_date] ??= []).push(g);
-  const dateKey = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   // Leading blanks + days. dir="rtl" on the container flips columns so ראשון is rightmost.
   const cells: (HebrewMonthModel['days'][number] | null)[] = [
@@ -70,8 +77,7 @@ export function HebrewCalendarGrid({
               />
             );
           }
-          const g = cell.gregorian;
-          const isToday = `${g.getFullYear()}-${g.getMonth()}-${g.getDate()}` === todayKey;
+          const isToday = cell.ymd === todayDay;
           const isShabbat = cell.weekday === 6;
           const holiday = holidays?.[cell.hebrewDay];
           const dayZmanim = zmanim?.[cell.hebrewDay];
@@ -83,7 +89,7 @@ export function HebrewCalendarGrid({
               className={`relative min-h-[68px] sm:min-h-[90px] p-1 sm:p-1.5 border-s border-b border-warm-border/60 ${tinted ? 'bg-accent-soft/40' : ''}`}
             >
               <span className="ennote absolute start-1.5 top-1.5 text-[9px] text-ink-faint">
-                {g.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {formatCivilDayShort(cell.ymd)}
               </span>
               <div
                 className={`font-display text-base ${
@@ -120,9 +126,9 @@ export function HebrewCalendarGrid({
                 </div>
               )}
               <div className="mt-0.5">
-                {(gatheringsByDate[dateKey(g)] ?? []).length > 0 && (
+                {(gatheringsByDate[cell.ymd] ?? []).length > 0 && (
                   <div className="space-y-0.5 mb-0.5">
-                    {(gatheringsByDate[dateKey(g)] ?? []).map(gt => <GatheringChip key={`${gt.family?.id ?? 's'}:${gt.id}`} gathering={gt} />)}
+                    {(gatheringsByDate[cell.ymd] ?? []).map(gt => <GatheringChip key={`${gt.family?.id ?? 's'}:${gt.id}`} gathering={gt} />)}
                   </div>
                 )}
                 <DayEvents events={dayEvents} />

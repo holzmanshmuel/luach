@@ -6,6 +6,7 @@ import { Avatar } from '@/app/components/Avatar';
 import { UserPrefsToolbar } from '@/app/components/UserPrefsToolbar';
 import { CombinedModeProvider } from '@/app/components/CombinedModeProvider';
 import { getT, type Lang } from '@/lib/translations';
+import { backArrow, dirForLang } from '@/lib/direction';
 import { requireAuth } from '@/lib/auth';
 import { fetchTimeline, type TimelineEntry } from '@/lib/calendar-data';
 import { resolveViewFamilies, aggregateAcrossFamilies } from '@/lib/combined';
@@ -30,6 +31,7 @@ export default async function TimelinePage() {
   const cookieStore = await cookies();
   const lang: Lang = cookieStore.get('lang')?.value === 'he' ? 'he' : 'en';
   const t = getT(lang);
+  const dir = dirForLang(lang);
   // This family's branch list — the accent stripe is chosen by a branch's
   // POSITION in it (see lib/branches.ts). requireAuth() above entered the tenant,
   // so this resolves the active family's own list.
@@ -55,11 +57,13 @@ export default async function TimelinePage() {
 
   return (
     <CombinedModeProvider combined={combined} viewFamilies={viewFamilies}>
-      <div className="min-h-screen bg-parchment" dir={lang === 'he' ? 'rtl' : 'ltr'}>
+      <div className="min-h-screen bg-parchment" dir={dir}>
         <header className="bg-parchment-card border-b border-warm-border px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/" className="text-sm text-ink-muted hover:text-ink transition-colors">
-              ← {t('nav.calendar')}
+              {/* The arrow comes from the active direction, not from the label —
+                  a baked-in '←' points away from the calendar on the RTL page. */}
+              <span aria-hidden>{backArrow(dir)}</span> {t('nav.calendar')}
             </Link>
             <span className="text-warm-border">|</span>
             <div className="flex items-center gap-2">

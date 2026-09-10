@@ -69,11 +69,15 @@ export function SubscribeModal({ label }: { label: string }) {
           <div className="rounded-md border border-warm-border bg-parchment p-3 mb-5">
             <div className="label mb-1.5">{t('subscribe.url_label')}</div>
             <div className="flex items-center gap-2">
+              {/* A URL is always LTR text. Without this the Hebrew page inherits
+                  dir=rtl, which right-aligns the field and truncates the START of
+                  the link — the half a relative needs to see to trust it. */}
               <input
                 readOnly
+                dir="ltr"
                 value={urls?.httpsUrl ?? '…'}
                 onFocus={e => e.currentTarget.select()}
-                className="flex-1 min-w-0 bg-parchment-card border border-warm-border rounded px-2.5 py-1.5 text-xs font-mono text-ink-2 outline-none"
+                className="flex-1 min-w-0 bg-parchment-card border border-warm-border rounded px-2.5 py-1.5 text-xs font-mono text-ink-2 outline-none text-start"
               />
               <button
                 type="button"

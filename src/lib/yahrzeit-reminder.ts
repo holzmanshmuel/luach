@@ -12,7 +12,7 @@
  *     nightly candle reminder.
  */
 
-import { fmtLongDay } from './zoned-day';
+import { addDays, fmtLongDay } from './zoned-day';
 
 /** Local `YYYY-MM-DD` (never toISOString — that shifts by the TZ offset). */
 export { ymd } from './zoned-day';
@@ -36,14 +36,17 @@ export function clampLead(raw: string | null | undefined): number {
 export const fmtDay = fmtLongDay;
 
 /**
- * The Gregorian date a reminder with this lead targets: `lead` days from the
- * given "today" (local midnight). lead=1 → tomorrow (candle tonight).
+ * The Gregorian date a reminder with this lead targets: `lead` days from the given
+ * "today". lead=1 → tomorrow (candle tonight).
+ *
+ * Keeps the caller's clock rather than forcing midnight: `civilDayInZone()` hands
+ * in a local-NOON civil-date carrier precisely so a midnight DST transition cannot
+ * move the day, and re-zeroing the hours here would have thrown that away. Only
+ * the local Y/M/D are read downstream (`ymd`, `fmtLongDay`), so a midnight-based
+ * Date still gives the identical answer.
  */
 export function targetDateForLead(today: Date, lead: number): Date {
-  const d = new Date(today);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + lead);
-  return d;
+  return addDays(today, lead);
 }
 
 /**

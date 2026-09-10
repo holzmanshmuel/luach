@@ -4,6 +4,7 @@ import { CalendarEvent, Gathering } from '@/lib/types';
 import { DayEvents } from './DayEvents';
 import { GatheringChip } from './GatheringChip';
 import { useUserPrefs } from './UserPrefsContext';
+import { civilDayOfMonth, civilMonthGrid, isInCivilMonth, type CivilDay } from '@/lib/civil-day';
 
 export function CalendarGrid({
   year,
@@ -12,6 +13,7 @@ export function CalendarGrid({
   gatherings = [],
   holidays,
   zmanim,
+  todayDay,
 }: {
   year: number;
   month: number;
@@ -19,20 +21,27 @@ export function CalendarGrid({
   gatherings?: Gathering[];
   holidays?: Record<number, { name: string; yomTov: boolean; chutzLaaretz?: boolean }>;
   zmanim?: Record<number, { candle?: string; havdalah?: string }>;
+  /**
+   * Today, as the DEPLOYMENT reckons it (`YYYY-MM-DD`, decided on the server).
+   * Not `new Date()` in the browser: a relative in Auckland is already on
+   * tomorrow and one in Los Angeles still on yesterday, so the family's calendar
+   * would ring a different cell for each of them.
+   */
+  todayDay: CivilDay;
 }) {
   const { t } = useUserPrefs();
-  const today = new Date();
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
-  const todayDate = isCurrentMonth ? today.getDate() : -1;
+  const todayDate = isInCivilMonth(todayDay, year, month) ? civilDayOfMonth(todayDay) : -1;
 
-  // Build calendar grid
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Build calendar grid. Derived in UTC (civilMonthGrid) rather than from a local
+  // `new Date(year, month, 1)`, so the column the 1st sits in is the same for
+  // every viewer.
+  const { firstWeekday: firstDay, days: daysInMonth } = civilMonthGrid(year, month);
 
   // Group events by day
   const eventsByDay: Record<number, CalendarEvent[]> = {};
   for (const event of events) {
-    const d = event.gregorianDate.getDate();
+    // Read off the civil-day STRING the server decided — never a Date instant.
+    const d = civilDayOfMonth(event.gregorianDay);
     if (!eventsByDay[d]) eventsByDay[d] = [];
     eventsByDay[d].push(event);
   }

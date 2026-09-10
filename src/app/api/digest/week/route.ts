@@ -5,7 +5,7 @@ import { Gathering } from '@/lib/types';
 import { safeEqual } from '@/lib/safe-equal';
 import { configuredSiteUrl } from '@/lib/base-url';
 import { collectItems, memberRecipients, type DigestEventRow } from '@/lib/digest';
-import { fmtShortDay, ymd } from '@/lib/zoned-day';
+import { addDays, civilDayInZone, fmtShortDay, ymd } from '@/lib/zoned-day';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,12 +23,6 @@ export const dynamic = 'force-dynamic';
  * two speak with one voice. The output of THIS route is unchanged and live n8n
  * workflows depend on it: keep it byte-identical.
  */
-
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
 
 export async function GET(request: NextRequest) {
   const expected = process.env.N8N_TOKEN;
@@ -68,9 +62,13 @@ export async function GET(request: NextRequest) {
   }
 
   return runWithTenant(familyId, async () => {
-    const today = startOfToday();
-    const end = new Date(today);
-    end.setDate(end.getDate() + 7); // next 7 days inclusive of today
+    // "Today" is the civil day it is in the DEPLOYMENT's zone, on a local-NOON
+    // carrier — the shared convention in zoned-day.ts. The local-midnight
+    // startOfToday() this replaces could land on the previous day in a zone that
+    // moves its clock at 00:00, silently shifting the whole window. Every label
+    // and key below reads local Y/M/D, so the message is byte-identical.
+    const today = civilDayInZone();
+    const end = addDays(today, 7); // next 7 days inclusive of today
 
     const [rows, gatherings] = await Promise.all([
       query<DigestEventRow>(`
