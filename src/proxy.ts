@@ -70,6 +70,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Always allow sign-out. Signing out must work from a HALF-established session —
+  // userId but no familyId — which is exactly what an invited relative has while
+  // they sit on /join/<token> deciding whether the Google account they landed on is
+  // the right one. The cookie gate below requires BOTH ids, so without this the
+  // "use a different Google account" escape hatch on that page would be swallowed
+  // and they could never get out of the wrong account. Destroying a session (or a
+  // non-existent one) needs no authorization.
+  if (pathname === '/api/logout') {
+    return NextResponse.next();
+  }
+
   // Always allow the PWA manifest + icons (fetched unauthenticated by browsers/OS
   // when installing or building the home-screen icon).
   if (
@@ -94,6 +105,15 @@ export async function proxy(request: NextRequest) {
   // enforced in the server-action guards (requireAuth/requireEditor/…), which
   // re-check against the DB — the proxy just keeps signed-out traffic off the app.
   if (!session.userId || !session.familyId) {
+    // SIGNED IN but with no active family — they abandoned onboarding, or their only
+    // membership was removed. Onboarding is where they need to be, and /login is a
+    // dead end for them: they are already signed in, so it would sign them in again
+    // and land them right back here. (/onboarding itself is allowlisted above, so
+    // this cannot loop.) Without this, a family-less user bounced between /login and
+    // /welcome with no way into the app at all.
+    if (session.userId) {
+      return NextResponse.redirect(new URL('/onboarding', request.url));
+    }
     // A cold visitor to the root gets the public marketing front door (/welcome);
     // any deeper gated path still bounces to the lightweight /login page carrying
     // ?from= so the post-sign-in redirect lands them back where they were headed.

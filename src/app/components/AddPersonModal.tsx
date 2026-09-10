@@ -22,7 +22,7 @@ async function convertGregorianToHebrew(m: number, d: number, y: number) {
 
 
 export function AddPersonModal() {
-  const { spell, t, branches } = useUserPrefs();
+  const { spell, t, branches, language } = useUserPrefs();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -250,6 +250,10 @@ export function AddPersonModal() {
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={isPending} className={`${btnPrimary} flex-1`}>
                   {isPending ? t('person.saving') : t('form.next_birthday')}
+                  {/* The arrow is JSX and follows the reading direction — it used to
+                      be a literal '→' inside the translated label, which pointed
+                      backwards on the Hebrew page. */}
+                  {!isPending && <span aria-hidden>{language === 'he' ? '←' : '→'}</span>}
                 </button>
                 <button type="button" onClick={handleClose} className={btnGhost}>{t('person.cancel')}</button>
               </div>

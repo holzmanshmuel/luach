@@ -91,6 +91,46 @@ describe('createFamilyWithOwner', () => {
     }
   });
 
+  it('creates a SECOND family for the same user, newest membership first', async () => {
+    // The /families/new path. createFamilyAction never checked the membership count —
+    // only /onboarding's page guard did — so the same helper serves both, and the
+    // second family must be a genuinely separate tenant rather than a no-op or an
+    // error. Newest-first ordering is load-bearing: the OAuth callback picks
+    // memberships[0] as the active family, so the family somebody just made is the
+    // one they land in.
+    const sub = `test-sub-second-family-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    let userId: number | null = null;
+    let firstId: number | null = null;
+    let secondId: number | null = null;
+
+    try {
+      const userRow = await upsertUser({ sub, email: 'second-family@example.com' });
+      userId = userRow.id;
+
+      firstId = (await createFamilyWithOwner(userId, 'Second Family Test One')).familyId;
+      secondId = (await createFamilyWithOwner(userId, 'Second Family Test Two')).familyId;
+      expect(secondId).not.toBe(firstId);
+
+      const memberships = await getMembershipsForUser(userId);
+      const mine = memberships.filter(m => m.family_id === firstId || m.family_id === secondId);
+      expect(mine).toHaveLength(2);
+      // Owner of BOTH — creating a second calendar does not demote the first.
+      expect(mine.every(m => m.role === 'owner')).toBe(true);
+      // getMembershipsForUser orders by created_at DESC.
+      expect(memberships[0].family_id).toBe(secondId);
+    } finally {
+      if (userId !== null) {
+        await systemQuery('DELETE FROM family_calendar.memberships WHERE user_id = $1', [userId]);
+        await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
+      }
+      for (const fid of [firstId, secondId]) {
+        if (fid !== null) {
+          await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [fid]);
+        }
+      }
+    }
+  });
+
   it('stores NULL for name_he when the Hebrew name is omitted', async () => {
     const sub = `test-sub-onboard-nohe-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     let userId: number | null = null;

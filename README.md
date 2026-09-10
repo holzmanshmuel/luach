@@ -53,9 +53,12 @@ repo — see [the demo family](#4-optional--the-demo-family).*
 - **Multi-family.** One deployment hosts many unrelated families, isolated from
   each other by Postgres row-level security. If you belong to more than one —
   your side and your in-laws' — there is a **combined view** that merges both
-  calendars with a colour per family.
+  calendars with a colour per family. Start a second one from the 🏠 family
+  switcher in the header.
 - **Google sign-in and invite links.** No shared password. An owner mints an
-  invite link; a relative opens it, signs in with Google, and is in.
+  invite link; a relative opens it, sees whose calendar it is, signs in with
+  Google, confirms, and is in. Nobody has to know whether their family already
+  has a calendar — the link decides.
 - **Printable QR cards** with per-person magic links, for relatives who will
   never manage a login.
 - **Installable PWA** with an offline shell.
@@ -103,6 +106,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE
   ON ALL TABLES IN SCHEMA family_calendar TO app_user;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA family_calendar TO app_user;
 GRANT EXECUTE ON FUNCTION family_calendar.redeem_invite(TEXT, INTEGER) TO app_user;
+GRANT EXECUTE ON FUNCTION family_calendar.peek_invite(TEXT) TO app_user;
 ```
 
 > ### ⚠️ Do not run the app as a superuser
@@ -175,7 +179,10 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Sign in with Google and onboarding will create your family.
+Sign in with Google. If you have no family yet you land on onboarding, which
+asks first whether you were **invited** — paste that link and you join the
+family that sent it — and otherwise creates your family. If you already have
+one, the same button just signs you in.
 
 ### 4. Optional — the demo family
 
@@ -187,7 +194,8 @@ DATABASE_URL="postgres://app_user:...@localhost:5432/luach" npm run seed:example
 
 This creates the fictional **Levi family** — three generations, a yahrzeit,
 Hebrew and English-dated birthdays, an anniversary, a bar mitzvah — and prints
-an invite link. Sign in, open the link, and you are in their calendar.
+an invite link. Open the link, sign in, press **Join this calendar**, and you
+are in.
 
 ### 5. Optional — import your existing spreadsheet
 

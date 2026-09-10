@@ -7,6 +7,7 @@ import { MonthNav } from '@/app/components/MonthNav';
 import { CalendarLegend } from '@/app/components/CalendarLegend';
 import { OnThisDay } from '@/app/components/OnThisDay';
 import { WelcomeBanner } from '@/app/components/WelcomeBanner';
+import { JoinedBanner } from '@/app/components/JoinedBanner';
 import { Header } from '@/app/components/Header';
 import { CombinedModeProvider } from '@/app/components/CombinedModeProvider';
 import { getSession, getSessionInfo, requireAuth } from '@/lib/auth';
@@ -23,6 +24,7 @@ import {
   dbMonthLabels,
 } from '@/lib/calendar-data';
 import { resolveViewFamilies, mapAcrossFamilies, tagWith } from '@/lib/combined';
+import { familyLabel } from '@/lib/family-label';
 import type { CalendarEvent, FamilyTag, Gathering } from '@/lib/types';
 import { cookies } from 'next/headers';
 
@@ -47,7 +49,14 @@ function resolveSelectedIds(combined: boolean, viewFamilies: FamilyTag[], active
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string; hmonth?: string; hyear?: string }>;
+  searchParams: Promise<{
+    month?: string;
+    year?: string;
+    hmonth?: string;
+    hyear?: string;
+    /** Set once by the invite redemption action — see JoinedBanner. */
+    joined?: string;
+  }>;
 }) {
   // Establish tenant context BEFORE any tenant-scoped query() runs. Must be at the
   // top level of the page fn (awaited here) — NOT folded into the Promise.all
@@ -70,8 +79,18 @@ export default async function Home({
   // Cheap system-scoped lookup (not tenant data) for the family switcher — every
   // membership row for this user, so the header can offer the others. `userId`
   // is guaranteed set here: requireAuth() above already confirmed a live session.
-  const { userId } = await getSession();
+  const { userId, familyId } = await getSession();
   const memberships = await getMembershipsForUser(userId!);
+
+  // ?joined=1 is the ONLY confirmation a relative gets that redeeming their invite
+  // worked. Resolved here, above the two render branches, because this file returns
+  // twice — a Hebrew-month grid and a Gregorian one — and putting it in only one of
+  // them would leave Hebrew readers (or English ones) with no confirmation at all.
+  const joinedFamily =
+    params.joined === '1' ? memberships.find(m => m.family_id === familyId) : undefined;
+  const joinedLabel = joinedFamily
+    ? familyLabel(lang, joinedFamily.family_name, joinedFamily.family_name_he)
+    : null;
 
   // ── Hebrew mode: Hebrew-month grid ──
   if (lang === 'he') {
@@ -121,6 +140,7 @@ export default async function Home({
           />
           <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
             <div className="flex-1 min-w-0">
+              {joinedLabel && <JoinedBanner lang={lang} familyLabel={joinedLabel} />}
               <WelcomeBanner />
               <OnThisDay events={upcomingAll} />
               <MonthNav hebrew={{ model, hMonth, hYear, isCurrent: hMonth === todayHeb.hebrewMonth && hYear === todayHeb.hebrewYear }} />
@@ -181,6 +201,7 @@ export default async function Home({
         />
         <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
           <div className="flex-1 min-w-0">
+            {joinedLabel && <JoinedBanner lang={lang} familyLabel={joinedLabel} />}
             <WelcomeBanner />
             <OnThisDay events={nextThirtyDaysEvents} />
             <MonthNav year={year} month={month} />

@@ -12,8 +12,11 @@ export const T: Record<Lang, Record<string, string>> = {
     'nav.date_check': 'Date check',
     'nav.subscribe': 'Subscribe',
     'nav.signout': 'Sign out',
-    // Family switcher
+    // Family switcher. Renders from ONE membership: a single-family user still
+    // needs to see which family they are in, and needs the door to a second one.
     'switcher.label': 'Switch family',
+    'switcher.heading': 'Your calendars',
+    'switcher.new': 'Start another calendar',
     'switcher.current': 'current',
     'switcher.show': 'Show',
     'switcher.combine_hint': 'Pick 2+ to merge',
@@ -171,23 +174,76 @@ export const T: Record<Lang, Record<string, string>> = {
     'tree.expand_all': 'Expand all',
     'tree.expand_all_title': 'Expand everyone',
     'tree.hint': 'Drag to move · pinch or scroll to zoom · double-tap to zoom in',
-    'login.intro': 'Family members: open the family invite link you were sent to get straight in — no sign-up needed.',
+    // Sign-in page. Reached by following a gated deep link while signed out, or
+    // from an error bounce — NOT the marketing front door (/welcome is that).
+    'login.title': 'Family Calendar',
+    'login.intro': 'Sign in to see your family calendar.',
+    'login.invite_note': 'Were you invited? Open the link you were sent — it signs you in and adds you in one step.',
     'login.google': 'Sign in with Google',
     'login.link_expired': 'That link has expired or been rotated. Ask whoever sent it for a fresh one.',
     'login.rate_limited': 'Too many attempts just now. Please wait a minute and try again.',
-    // Onboarding (create your first family)
-    'onboarding.welcome': 'Welcome! 🎉',
-    'onboarding.subtitle': 'Let’s set up your family’s calendar.',
+    // Onboarding (create your first family). The invited_* strip comes FIRST on the
+    // page: creating a second, empty family for a family that already has one is
+    // unmergeable, while failing to create is a ten-second recovery.
+    'onboarding.welcome': 'Let’s get you started',
+    'onboarding.invited_q': 'Were you invited to a family calendar?',
+    'onboarding.invited_body': 'Open the invite link that was sent to you and you will join that calendar. You do not need to create anything here.',
+    'onboarding.invited_paste_label': 'Paste the invite link',
+    'onboarding.invited_paste_go': 'Open it',
+    'onboarding.invited_paste_error': 'That does not look like an invite link. Copy the whole link, including the part before /join/.',
+    'onboarding.create_heading': 'Or start a new family calendar',
+    'onboarding.subtitle': 'Give it a name, then invite everyone with one link.',
     'onboarding.name_label': 'Family name',
     'onboarding.name_placeholder': 'The Levy Family',
     'onboarding.name_he_label': 'Hebrew name (optional)',
     'onboarding.name_he_placeholder': 'משפחת לוי',
-    'onboarding.create': 'Create calendar',
+    'onboarding.create': 'Create the calendar',
     'onboarding.creating': 'Creating…',
-    // Invite / join flow
-    'join.error_title': 'This invite didn’t work',
-    'join.error_body': 'The link may have expired or been revoked. Ask whoever invited you for a fresh one.',
-    'join.error_home': 'Go to sign in',
+    // Start ANOTHER family calendar (/families/new) — for someone who already has
+    // one. The warn line prevents the mirror mistake: creating a second family when
+    // what you meant was to invite relatives into the one you have.
+    'newfamily.title': 'Start another family calendar',
+    'newfamily.body': 'This makes a separate calendar, with its own people and its own events. You will be able to switch between them, or see them together.',
+    'newfamily.warn': 'Wanted to add relatives to a calendar you already have? Invite them instead.',
+    'newfamily.warn_link': 'Invite family',
+    'newfamily.cancel': 'Back to my calendar',
+    // Invite landing page (/join/<token>) — state 1: nobody is signed in yet. Names
+    // the family BEFORE asking for a Google account, and offers no create path.
+    'invite_land.title': 'You’re invited to the {family} calendar',
+    'invite_land.body': 'Birthdays, anniversaries and yahrzeits — each one on both the Hebrew and the English date.',
+    'invite_land.signin': 'Continue with Google',
+    'invite_land.privacy_note': 'Your Google account is only used to know who you are. Nothing is ever posted anywhere.',
+    // State 2: signed in, not a member yet — the confirmation that actually joins.
+    // Shows WHICH Google account got picked, because on a shared family phone it is
+    // often the wrong one.
+    'invite_confirm.title': 'Join the {family} calendar?',
+    'invite_confirm.body_editor': 'You will be able to see the calendar and to add or change events.',
+    'invite_confirm.body_viewer': 'You will be able to see the calendar. Only editors can change it.',
+    'invite_confirm.signed_in_as': 'Signed in as {email}',
+    'invite_confirm.switch_account': 'Use a different Google account',
+    'invite_confirm.join': 'Join this calendar',
+    // State 3: already a member (very often the OWNER, checking their own link).
+    'invite_member.title': 'You are already in the {family} calendar',
+    'invite_member.body': 'There is nothing left to do — your account was added already.',
+    'invite_member.open': 'Open the calendar',
+    // State 4: the link is dead but real, so name the family and say what to do.
+    'invite_expired.title': 'This invite link has expired',
+    'invite_expired.body': 'Invite links to the {family} calendar stop working after 30 days. Ask whoever sent it to send you a new one.',
+    'invite_revoked.title': 'This invite link was turned off',
+    'invite_revoked.body': 'The {family} calendar no longer accepts this link. Ask whoever sent it to send you a new one.',
+    // Confirmation banner on / after joining (driven by ?joined=1, so it is gone on
+    // the next navigation). Names the Subscribe control — if that label changes,
+    // this string changes with it.
+    'joined.title': 'You are in the {family} calendar',
+    'joined.body': 'Use Subscribe at the top of the page to add it to the calendar on your phone, so birthdays and yahrzeits show up there too.',
+    // Unknown / unusable token (/join-invalid). The reason stays deliberately
+    // opaque; the button is chosen from the reader's session so it is never "sign
+    // in" for somebody who already is.
+    'join.error_title': 'This link does not work',
+    'join.error_body': 'It may have been copied only partly, or turned off. Ask whoever invited you to send a new one.',
+    'join.error_home': 'Sign in',
+    'join.error_home_calendar': 'Go to my calendar',
+    'join.error_home_start': 'Get started',
     // Invite admin (owner)
     'invite.page_title': 'Invite family',
     'invite.page_intro': 'Send a link to a relative and they join your family calendar. Editors can add and change events; viewers can only look.',
@@ -210,7 +266,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'invite.copy': 'Copy',
     'invite.copied': 'Copied',
     'invite.show_once': 'Copy this now — for security we only show the full link once.',
-    'invite.back': '← Back to calendar',
+    'invite.back': 'Back to calendar',
     'timeline.empty': 'No dated family events yet — add birthdays or anniversaries and they’ll appear here.',
     // Person form
     'person.name': 'Name',
@@ -302,7 +358,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'form.last_placeholder': 'e.g. Levi',
     'form.person_name_placeholder': 'e.g. Noa Levi',
     'form.parents_help': 'Select one or both parents from the family',
-    'form.next_birthday': 'Next: add birthday →',
+    'form.next_birthday': 'Next: add birthday',
     'form.person_added_suffix': 'added! Now add a birthday (optional).',
     'form.add_bday_for': 'Add a birthday for',
     'form.hebrew_date': 'Hebrew date',
@@ -339,9 +395,12 @@ export const T: Record<Lang, Record<string, string>> = {
     'landing.how.step1': 'Create your family calendar',
     'landing.how.step2': 'Invite the family with one link',
     'landing.how.step3': 'Everyone sees it in their language',
-    'landing.cta': 'Start your family’s calendar',
-    'landing.invite': 'Have an invite link? Just open it.',
-    'landing.signin': 'Already have a calendar? Sign in',
+    // ONE button on /welcome. The page used to carry a second underlined link
+    // pointing at the IDENTICAL URL, which read as a choice a visitor could get
+    // wrong; it is now a plain note that the same button signs returning members in.
+    'landing.cta': 'Start your family calendar',
+    'landing.entry_note': 'Already have a family calendar? The same button signs you in.',
+    'landing.invite': 'Got an invite link? Open it — that is all you need to do.',
     'landing.source': 'Luach is open source — run it on your own server.',
     'landing.source_link': 'View the code on GitHub',
 
@@ -373,6 +432,8 @@ export const T: Record<Lang, Record<string, string>> = {
     'nav.signout': 'התנתקות',
     // Family switcher
     'switcher.label': 'החלפת משפחה',
+    'switcher.heading': 'היומנים שלכם',
+    'switcher.new': 'פתיחת יומן נוסף',
     'switcher.current': 'נוכחית',
     'switcher.show': 'הצג',
     'switcher.combine_hint': 'בחר/י 2+ למיזוג',
@@ -528,23 +589,63 @@ export const T: Record<Lang, Record<string, string>> = {
     'tree.expand_all': 'הרחבת הכל',
     'tree.expand_all_title': 'הרחבת כולם',
     'tree.hint': 'גררו להזזה · צביטה או גלילה לזום · הקשה כפולה לזום',
-    'login.intro': 'בני משפחה: פִּתחו את קישור ההזמנה המשפחתי שנשלח אליכם כדי להיכנס ישירות — בלי הרשמה.',
+    'login.title': 'יומן משפחתי',
+    'login.intro': 'היכנסו כדי לראות את היומן המשפחתי שלכם.',
+    'login.invite_note': 'הוזמנתם? פתחו את הקישור שנשלח אליכם — הוא מכניס אתכם ומצרף אתכם בפעולה אחת.',
     'login.google': 'התחברות עם Google',
     'login.link_expired': 'הקישור פג או הוחלף. בקשו קישור חדש ממי ששלח אותו.',
     'login.rate_limited': 'יותר מדי ניסיונות כרגע. המתינו דקה ונסו שוב.',
     // Onboarding (create your first family)
-    'onboarding.welcome': 'ברוכים הבאים! 🎉',
-    'onboarding.subtitle': 'בואו נגדיר את יומן המשפחה שלכם.',
+    'onboarding.welcome': 'בואו נתחיל',
+    'onboarding.invited_q': 'הוזמנתם ליומן משפחתי?',
+    'onboarding.invited_body': 'פתחו את קישור ההזמנה שנשלח אליכם ותצטרפו לאותו יומן. אין צורך ליצור כאן שום דבר.',
+    'onboarding.invited_paste_label': 'הדביקו את קישור ההזמנה',
+    'onboarding.invited_paste_go': 'פתחו אותו',
+    'onboarding.invited_paste_error': 'זה לא נראה כמו קישור הזמנה. העתיקו את הקישור המלא, כולל החלק שלפני /join/.',
+    'onboarding.create_heading': 'או פתחו יומן משפחתי חדש',
+    'onboarding.subtitle': 'תנו לו שם, ואחר כך הזמינו את כולם בקישור אחד.',
     'onboarding.name_label': 'שם המשפחה',
     'onboarding.name_placeholder': 'משפחת לוי',
     'onboarding.name_he_label': 'שם בעברית (רשות)',
     'onboarding.name_he_placeholder': 'משפחת לוי',
-    'onboarding.create': 'יצירת יומן',
+    'onboarding.create': 'יצירת היומן',
     'onboarding.creating': 'יוצר…',
-    // Invite / join flow
-    'join.error_title': 'ההזמנה לא עבדה',
-    'join.error_body': 'ייתכן שהקישור פג או בוטל. בקשו קישור חדש ממי שהזמין אתכם.',
-    'join.error_home': 'למסך הכניסה',
+    // Start ANOTHER family calendar (/families/new)
+    'newfamily.title': 'פתיחת יומן משפחתי נוסף',
+    'newfamily.body': 'זה יוצר יומן נפרד, עם אנשים ואירועים משל עצמו. תוכלו לעבור ביניהם, או לראות אותם יחד.',
+    'newfamily.warn': 'רציתם להוסיף בני משפחה ליומן שכבר יש לכם? הזמינו אותם במקום.',
+    'newfamily.warn_link': 'הזמנת בני משפחה',
+    'newfamily.cancel': 'חזרה ליומן שלי',
+    // Invite landing page (/join/<token>) — state 1, signed out
+    'invite_land.title': 'הוזמנתם ליומן של {family}',
+    'invite_land.body': 'ימי הולדת, ימי נישואין ויארצייטים — כל אחד גם בתאריך העברי וגם בתאריך הלועזי.',
+    'invite_land.signin': 'המשיכו עם Google',
+    'invite_land.privacy_note': 'חשבון Google משמש רק כדי לדעת מי אתם. שום דבר לא מתפרסם בשום מקום.',
+    // State 2 — signed in, confirm
+    'invite_confirm.title': 'להצטרף ליומן של {family}?',
+    'invite_confirm.body_editor': 'תוכלו לראות את היומן וגם להוסיף או לשנות אירועים.',
+    'invite_confirm.body_viewer': 'תוכלו לראות את היומן. רק עורכים יכולים לשנות אותו.',
+    'invite_confirm.signed_in_as': 'מחוברים בתור {email}',
+    'invite_confirm.switch_account': 'להשתמש בחשבון Google אחר',
+    'invite_confirm.join': 'הצטרפות ליומן',
+    // State 3 — already a member
+    'invite_member.title': 'אתם כבר ביומן של {family}',
+    'invite_member.body': 'אין מה לעשות — החשבון שלכם כבר נוסף.',
+    'invite_member.open': 'פתיחת היומן',
+    // State 4 — expired / revoked
+    'invite_expired.title': 'תוקף קישור ההזמנה הזה פג',
+    'invite_expired.body': 'קישורי הזמנה ליומן של {family} מפסיקים לעבוד אחרי 30 יום. בקשו ממי ששלח לכם לשלוח קישור חדש.',
+    'invite_revoked.title': 'קישור ההזמנה הזה בוטל',
+    'invite_revoked.body': 'היומן של {family} לא מקבל יותר את הקישור הזה. בקשו ממי ששלח לכם לשלוח קישור חדש.',
+    // Joined confirmation banner on /
+    'joined.title': 'אתם ביומן של {family}',
+    'joined.body': 'לחצו על ”הרשמה“ בראש העמוד כדי להוסיף אותו ליומן בטלפון, כך שימי הולדת ויארצייטים יופיעו גם שם.',
+    // Unknown / unusable token (/join-invalid)
+    'join.error_title': 'הקישור הזה לא עובד',
+    'join.error_body': 'ייתכן שהוא הועתק רק בחלקו, או שבוטל. בקשו ממי שהזמין אתכם לשלוח קישור חדש.',
+    'join.error_home': 'כניסה',
+    'join.error_home_calendar': 'ליומן שלי',
+    'join.error_home_start': 'להתחיל',
     // Invite admin (owner)
     'invite.page_title': 'הזמנת בני משפחה',
     'invite.page_intro': 'שלחו קישור לבן משפחה והוא יצטרף ליומן המשפחתי. עורכים יכולים להוסיף ולשנות אירועים; צופים רק מסתכלים.',
@@ -567,7 +668,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'invite.copy': 'העתקה',
     'invite.copied': 'הועתק',
     'invite.show_once': 'העתיקו עכשיו — מטעמי אבטחה הקישור המלא מוצג פעם אחת בלבד.',
-    'invite.back': '← חזרה ליומן',
+    'invite.back': 'חזרה ליומן',
     'timeline.empty': 'עדיין אין אירועים מתוארכים — הוסיפו ימי הולדת או ימי נישואין והם יופיעו כאן.',
     // Person form
     'person.name': 'שם',
@@ -657,7 +758,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'form.last_placeholder': 'למשל לוי',
     'form.person_name_placeholder': 'למשל נועה לוי',
     'form.parents_help': 'בחרו הורה אחד או שניים מהמשפחה',
-    'form.next_birthday': 'הבא: הוספת יום הולדת →',
+    'form.next_birthday': 'הבא: הוספת יום הולדת',
     'form.person_added_suffix': 'נוסף! כעת אפשר להוסיף יום הולדת (אופציונלי).',
     'form.add_bday_for': 'הוספת יום הולדת עבור',
     'form.hebrew_date': 'תאריך עברי',
@@ -694,9 +795,9 @@ export const T: Record<Lang, Record<string, string>> = {
     'landing.how.step1': 'צרו את לוח המשפחה שלכם',
     'landing.how.step2': 'הזמינו את המשפחה בקישור אחד',
     'landing.how.step3': 'כל אחד רואה אותו בשפה שלו',
-    'landing.cta': 'התחילו את לוח המשפחה שלכם',
-    'landing.invite': 'קיבלתם קישור הזמנה? פשוט פתחו אותו.',
-    'landing.signin': 'כבר יש לכם לוח משפחתי? התחברו',
+    'landing.cta': 'פתחו יומן משפחתי',
+    'landing.entry_note': 'יש לכם כבר יומן משפחתי? אותו כפתור מכניס אתכם.',
+    'landing.invite': 'קיבלתם קישור הזמנה? פתחו אותו — זה כל מה שצריך.',
     'landing.source': 'לוּחַ הוא קוד פתוח — אפשר להריץ אותו על שרת משלכם.',
     'landing.source_link': 'לצפייה בקוד ב‑GitHub',
 
@@ -718,4 +819,29 @@ export const T: Record<Lang, Record<string, string>> = {
 
 export function getT(lang: Lang): (key: string) => string {
   return (key: string) => T[lang][key] ?? T['en'][key] ?? key;
+}
+
+/**
+ * Split a whole-sentence template around ONE `{placeholder}`, returning the text
+ * before it and the text after it.
+ *
+ * Why this exists rather than a plain `.replace()`: the values substituted into the
+ * onboarding/invite copy are a family name and an email address, which are often
+ * Latin script inside an otherwise-Hebrew RTL sentence. Rendered as one flat string
+ * the bidi algorithm reorders them (an email can come out with its domain leading).
+ * Callers render `{before}<bdi>{value}</bdi>{after}` — see the Interpolated
+ * component — so the value is direction-isolated while the SENTENCE stays whole and
+ * translatable, and Hebrew is free to put the placeholder wherever its grammar wants
+ * it. Never assemble one of these sentences from two keys.
+ *
+ * A template that has lost its placeholder still renders, just without the value.
+ */
+export function splitTemplate(
+  template: string,
+  placeholder: string
+): [before: string, after: string] {
+  const marker = `{${placeholder}}`;
+  const at = template.indexOf(marker);
+  if (at === -1) return [template, ''];
+  return [template.slice(0, at), template.slice(at + marker.length)];
 }

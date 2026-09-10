@@ -1,4 +1,7 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { getSession } from '@/lib/auth';
+import { getMembershipsForUser } from '@/lib/users';
 // Import from the server-safe module directly — NOT through Modal ('use client'),
 // where the string would cross the client boundary and drop its classes at render.
 import { btnPrimary } from '@/lib/ui';
@@ -10,6 +13,16 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ from?: string; error?: string }>;
 }) {
+  // A SIGNED-IN visitor has nothing to do here, and this page is where several
+  // recovery paths used to dump them — telling an existing member to sign in again
+  // is a dead end. Send them where they actually belong. Read via the systemQuery-
+  // backed helper: a user with no family has no tenant to scope a query() by.
+  const session = await getSession();
+  if (session.userId) {
+    const memberships = await getMembershipsForUser(session.userId);
+    redirect(memberships.length > 0 ? '/' : '/onboarding');
+  }
+
   const params = await searchParams;
   const invalidLink = params.error === 'invalid_link';
   const cookieStore = await cookies();
@@ -29,7 +42,8 @@ export default async function LoginPage({
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="sig-star text-5xl mb-4">✡</div>
-          <h1 className="font-display text-3xl text-ink">Family Calendar</h1>
+          {/* Translated: this was a literal English <h1> sitting inside an RTL page. */}
+          <h1 className="font-display text-3xl text-ink">{t('login.title')}</h1>
           <p className="text-ink-muted mt-2 text-sm">
             {t('login.intro')}
           </p>
@@ -55,9 +69,16 @@ export default async function LoginPage({
 
         {/* Primary (and only) path: Google sign-in. A plain link triggers the GET
             entry route, which mints the CSRF state and redirects to Google. */}
-        <a href={googleHref} className={`${btnPrimary} w-full mb-6`}>
+        <a href={googleHref} className={`${btnPrimary} w-full mb-4`}>
           {t('login.google')}
         </a>
+
+        {/* The other way in, for the audience this page actually gets: someone who
+            followed a link while signed out. An invite link both signs them in and
+            joins them, so it is strictly less work than this button. */}
+        <p className="mb-6 text-center text-xs text-ink-muted leading-relaxed">
+          {t('login.invite_note')}
+        </p>
       </div>
     </div>
   );
