@@ -16,8 +16,13 @@ export default async function NamesPage() {
      ORDER BY name_he_status NULLS FIRST, name`
   );
 
+  // dir="ltr" below is deliberate. This page is hardcoded English (like its
+  // sibling admin pages), but the root layout sets dir="rtl" for a Hebrew
+  // viewer — which scrambles the English text, reorders rows and turns
+  // "← Calendar" into "Calendar ←". Pinning the direction to the language the
+  // page is actually written in keeps it readable until it is translated.
   return (
-    <div className="min-h-screen bg-parchment">
+    <div dir="ltr" className="min-h-screen bg-parchment">
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Link href="/" className="text-sm text-ink-muted hover:text-ink transition-colors">← Calendar</Link>
         <h1 className="font-display text-3xl text-ink mt-3 mb-1">Hebrew names</h1>

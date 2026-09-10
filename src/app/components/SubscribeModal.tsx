@@ -71,6 +71,12 @@ export function SubscribeModal({ label }: { label: string }) {
             <div className="flex items-center gap-2">
               <input
                 readOnly
+                // A URL is always left-to-right. Without this it inherits the
+                // page's RTL direction in Hebrew and renders right-aligned with
+                // the wrong end truncated — so the part a person needs to check
+                // is the part they cannot see.
+                dir="ltr"
+                aria-label={t('subscribe.url_label')}
                 value={urls?.httpsUrl ?? '…'}
                 onFocus={e => e.currentTarget.select()}
                 className="flex-1 min-w-0 bg-parchment-card border border-warm-border rounded px-2.5 py-1.5 text-xs font-mono text-ink-2 outline-none"

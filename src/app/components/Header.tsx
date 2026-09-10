@@ -50,6 +50,7 @@ export function Header({
           <Link
             href="/admin/access"
             className="label hover:text-ink flex items-center gap-1.5 transition-colors"
+            aria-label={t('nav.access')}
             title={t('nav.access')}
           >
             <span>🔑</span><span className="hidden sm:inline">{t('nav.access')}</span>
@@ -59,6 +60,7 @@ export function Header({
           <Link
             href="/admin/names"
             className="label hover:text-ink flex items-center gap-1.5 transition-colors"
+            aria-label={t('nav.hebrew_names')}
             title={t('nav.hebrew_names')}
           >
             <span aria-hidden>א</span><span className="hidden sm:inline">{t('nav.hebrew_names')}</span>
@@ -68,6 +70,7 @@ export function Header({
           <Link
             href="/admin/dates"
             className="label hover:text-ink flex items-center gap-1.5 transition-colors"
+            aria-label={t('nav.date_check')}
             title={t('nav.date_check')}
           >
             <span aria-hidden>🩺</span><span className="hidden sm:inline">{t('nav.date_check')}</span>
@@ -77,6 +80,7 @@ export function Header({
           <Link
             href="/admin/branches"
             className="label hover:text-ink flex items-center gap-1.5 transition-colors"
+            aria-label={t('nav.branches')}
             title={t('nav.branches')}
           >
             <span aria-hidden>🌿</span><span className="hidden sm:inline">{t('nav.branches')}</span>
