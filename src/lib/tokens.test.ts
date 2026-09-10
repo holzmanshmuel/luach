@@ -150,6 +150,14 @@ describe('redeemInvite', () => {
         [userId, familyId]
       );
       expect(m.role).toBe('owner'); // NOT downgraded to viewer
+
+      // And — the half this test used to miss — the RETURNED role must be the
+      // owner's too. The caller writes it straight into the session cookie and
+      // proxy.ts gates /admin/* on it, so returning the token's 'viewer' locked a
+      // real owner out of their own admin pages the moment they clicked their own
+      // invite link to check it. A correct database row is not enough; the value
+      // handed back is the one that decides what the user can do next.
+      expect(result).toHaveProperty('role', 'owner');
     } finally {
       await cleanup({ familyIds: [familyId], userIds: [userId] });
     }

@@ -45,6 +45,26 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Log
 
+### 2026-09-10 — owner lock-out on re-redeeming your own invite (live bug)
+
+- **An owner who clicked their own invite link lost their admin pages.**
+  `redeem_invite()` (migrate-v11) returns the role baked into the TOKEN, and its
+  `INSERT … ON CONFLICT DO NOTHING` means an existing member keeps their stored role —
+  so the database stayed correct while the function handed back `viewer`. `join/[token]`
+  writes that straight into the session cookie, `proxy.ts` gates `/admin/*` on
+  `session.role !== 'owner'`, and `Header` hides 🔑 Access on the same value. Below two
+  memberships the family switcher does not render, so a single-family owner's only way
+  out was signing out and back in. Owners *do* click their own invite links to check them.
+- Fixed in `redeemInvite()` (TS, no migration): re-read the membership and return the role
+  the user ACTUALLY holds. **The token decides what a NEW member gets; it must never decide
+  what an existing one keeps.**
+- 🪤 **The test for this already existed and passed.** `tokens.test.ts` → "does NOT
+  downgrade/overwrite an existing membership role on re-redeem" asserted the *database
+  row* was still `owner` and never asserted the *returned* role — the value that actually
+  reaches the session and decides what the user can do. Its comment even claimed "role
+  stays owner". Verified the strengthened assertion fails on the old code before fixing.
+  **When a function's output drives authorization, assert the output, not just the row.**
+
 ### 2026-09-10 — date-consistency audit (`/admin/dates`)
 
 - **Found a whole class of silent wrong dates, and shipped the check for it.** An event

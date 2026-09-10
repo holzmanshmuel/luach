@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'crypto';
 import { query, systemQuery } from '@/lib/db';
+import { getMembership, type MembershipRole } from '@/lib/users';
 
 export type TokenKind = 'shared' | 'personal' | 'invite';
 
@@ -204,13 +205,15 @@ export async function createInviteToken(
  * Validates: the token exists, is an 'invite', is not revoked, and is not expired.
  * Creating the membership uses ON CONFLICT (user_id, family_id) DO NOTHING so a
  * user who already belongs (or double-clicks the link) is treated as success and
- * is never downgraded to the invite's role. Returns the joined family + the role
- * the user actually holds, or an { error } the caller renders as a friendly page.
+ * their stored role is never downgraded. Returns the joined family + the role the
+ * user ACTUALLY holds, or an { error } the caller renders as a friendly page.
+ *
+ * ⚠ The SQL function returns the TOKEN's role, not the redeemer's — see below.
  */
 export async function redeemInvite(
   rawToken: string,
   userId: number,
-): Promise<{ familyId: number; role: 'editor' | 'viewer' } | { error: string }> {
+): Promise<{ familyId: number; role: MembershipRole } | { error: string }> {
   const hash = hashToken(rawToken);
 
   // The joiner has NO active family, so there is no tenant GUC to scope by — and
@@ -232,5 +235,23 @@ export async function redeemInvite(
   if (!redeemed) {
     return { error: 'This invite link is invalid or has expired.' };
   }
-  return { familyId: redeemed.out_family_id, role: redeemed.out_role };
+
+  // ── Trust the MEMBERSHIP, not the token ──
+  // redeem_invite() returns the role baked into the invite, and its INSERT is
+  // ON CONFLICT DO NOTHING — so for a user who already belongs, the database keeps
+  // their real role while the function still hands back the token's. The caller
+  // writes this value straight into the session cookie, and proxy.ts gates
+  // /admin/* on `session.role !== 'owner'`.
+  //
+  // The consequence was a live foot-gun: an owner clicking their OWN invite link
+  // to check that it works got a `viewer` session, lost the admin pages and the
+  // 🔑 Access link, and — below two memberships the family switcher does not even
+  // render — could only recover by signing out. So re-read the role the user
+  // actually holds and return that. The token decides what a NEW member gets; it
+  // must never decide what an existing one keeps.
+  const membership = await getMembership(userId, redeemed.out_family_id);
+  return {
+    familyId: redeemed.out_family_id,
+    role: membership?.role ?? redeemed.out_role,
+  };
 }
