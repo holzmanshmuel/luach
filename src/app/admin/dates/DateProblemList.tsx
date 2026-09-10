@@ -23,11 +23,17 @@ export function DateProblemList({ problems }: { problems: Finding[] }) {
   );
 }
 
-/** "10 days earlier than" / "3 days later than" — never a bare signed number. */
+/**
+ * "11 days earlier" / "1 day later" — the SIGN read out loud, never a bare number.
+ *
+ * `offset_days` is the stored English date minus the date the Hebrew one implies, so
+ * a negative gap means the English date sits earlier in the year. The phrase has to
+ * complete "The English date is ___ than the Hebrew date implies", which is why it
+ * carries no "apart" — an earlier draft rendered "31 days earlier apart".
+ */
 function gapPhrase(offsetDays: number): string {
   const n = Math.abs(offsetDays);
-  const unit = n === 1 ? 'day' : 'days';
-  return `${n} ${unit} ${offsetDays < 0 ? 'earlier' : 'later'}`;
+  return `${n} ${n === 1 ? 'day' : 'days'} ${offsetDays < 0 ? 'earlier' : 'later'}`;
 }
 
 function ProblemRow({ problem: p }: { problem: Finding }) {
@@ -78,9 +84,16 @@ function ProblemRow({ problem: p }: { problem: Finding }) {
       </div>
 
       <p className="text-xs text-ink-muted mt-1.5">
-        The two dates are{' '}
-        <span className="text-ink-2">{p.offset_days !== null ? gapPhrase(p.offset_days) : 'far'}</span>{' '}
-        apart. One of them is wrong — which one?
+        {p.offset_days !== null ? (
+          <>
+            The English date is{' '}
+            <span className="text-ink-2">{gapPhrase(p.offset_days)}</span> than the Hebrew date
+            implies.
+          </>
+        ) : (
+          'These two dates are far apart.'
+        )}{' '}
+        One of them is wrong — which one?
       </p>
 
       <div className="mt-3 space-y-2.5">
