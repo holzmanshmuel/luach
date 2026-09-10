@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { resolveServerActionOrigins } from './src/lib/server-action-origins';
 
 /**
  * Baseline security headers applied to every route.
@@ -16,8 +17,24 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
 ];
 
+/**
+ * Origins allowed to invoke Server Actions.
+ *
+ * Behind a reverse proxy the browser's `origin` and the forwarded
+ * `x-forwarded-host` never match, and Next aborts every Server Action as a CSRF
+ * risk — which kills every edit in the app while leaving pages and sign-in
+ * working, so the site looks healthy. See src/lib/server-action-origins.ts.
+ *
+ * ⚠️ Read at BUILD time: `next build` bakes the resolved list into the standalone
+ * output, so changing the variable needs a redeploy, not a restart.
+ */
+const allowedOrigins = resolveServerActionOrigins(process.env);
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+  ...(allowedOrigins.length > 0
+    ? { experimental: { serverActions: { allowedOrigins } } }
+    : {}),
   // Drop the informational `x-powered-by: Next.js` header (LOW: fingerprinting).
   poweredByHeader: false,
   async headers() {
