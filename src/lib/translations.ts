@@ -332,6 +332,9 @@ export const T: Record<Lang, Record<string, string>> = {
     'err.dup_event': '{name} already has this occasion. Edit the existing one instead.',
     'err.person_exists': '{name} already exists — you can add events to them from the calendar.',
     'err.name_clash': 'Another family member is already named “{name}”. Please use a different name.',
+    // Shown when a submitted person id is not one of this family's people — a stale
+    // page, or a request that was not made by this family's own UI.
+    'err.unknown_person': 'That person is not in this family — please reload the page and try again.',
     'err.self_parent': 'A person can’t be their own parent.',
     'err.parent_cycle': 'That parent choice would loop the family tree (you picked a descendant). Please pick a different parent.',
     'err.phone_format': 'Phone must look like +14155551234 (country code first).',
@@ -733,6 +736,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'err.dup_event': 'ל{name} כבר יש את האירוע הזה. ערכו את הקיים במקום.',
     'err.person_exists': '{name} כבר קיים — אפשר להוסיף אירועים מהיומן.',
     'err.name_clash': 'כבר קיים בן משפחה בשם “{name}”. נא להשתמש בשם אחר.',
+    'err.unknown_person': 'האדם הזה אינו במשפחה הזו — רעננו את הדף ונסו שוב.',
     'err.self_parent': 'אדם לא יכול להיות ההורה של עצמו.',
     'err.parent_cycle': 'בחירת ההורה הזו תיצור לולאה בעץ (בחרתם צאצא). נא לבחור הורה אחר.',
     'err.phone_format': 'הטלפון צריך להיראות כמו ‎+14155551234 (קידומת מדינה תחילה).',

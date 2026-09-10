@@ -2,8 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { query } from '@/lib/db';
-import { getSession, requireAdmin } from '@/lib/auth';
-import { runWithTenant } from '@/lib/tenant';
+import { withAdminOrError } from '@/lib/auth';
 import { setEventEnglishDate, setEventHebrewDate } from '@/lib/date-corrections';
 import { auditEvent, type AuditableEvent } from '@/lib/date-consistency';
 
@@ -17,37 +16,15 @@ import { auditEvent, type AuditableEvent } from '@/lib/date-consistency';
  * so a stale page, a doctored form or a double-submit can never write a value the
  * server did not itself compute from the family's own data.
  *
- * Both are tenant-scoped: requireAdmin() establishes the caller's family context
- * before query() runs, so the WHERE clauses below cannot reach another family's
- * rows even with a guessed id — RLS drops them.
- */
-
-/**
- * Run `fn` as the verified owner of the caller's family, with tenant context that
- * actually survives into it.
+ * Both are tenant-scoped: withAdminOrError() verifies the owner live and runs the
+ * body inside the caller's family context, so the WHERE clauses below cannot reach
+ * another family's rows even with a guessed id — RLS drops them.
  *
- * ── WHY NOT JUST `await requireAdmin()` ──
- * `requireAdmin()` ends by calling `enterTenant()`, which is enough for a PAGE
- * (a React render memoizes the request-scoped holder, so the value survives the
- * guard resolving back to its caller). It is NOT enough inside a Server Action:
- * there, `React.cache()` does not memoize the holder and `enterWith()` is lost
- * when the awaited guard resolves — so the very next `query()` throws
- * "No tenant context: query() called without an active family."
- *
- * That asymmetry is why every page rendered perfectly while every edit in the app
- * failed. `runWithTenant()` uses `AsyncLocalStorage.run()`, which wraps the
- * callback unambiguously, so the context is present for everything inside it.
+ * `withAdminOrError` is the shared helper in lib/auth.ts; the local `asOwner`
+ * these two actions used to carry was its first, one-file draft. Every Server
+ * Action in the app now goes through the same wrappers, for the reason documented
+ * there: a bare `await requireAdmin()` leaves the next `query()` with no tenant.
  */
-async function asOwner<T>(fn: () => Promise<T>): Promise<T | { error: string }> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { error: 'Admin access required.' };
-  }
-  const { familyId } = await getSession();
-  if (!familyId) return { error: 'Admin access required.' };
-  return runWithTenant(familyId, fn);
-}
 
 /** Load one event in the caller's family, shaped for the audit. Null if not theirs. */
 async function loadAuditableEvent(eventId: number): Promise<AuditableEvent | null> {
@@ -73,24 +50,24 @@ async function loadAuditableEvent(eventId: number): Promise<AuditableEvent | nul
  */
 export async function trustHebrewDateAction(eventId: number): Promise<{ error?: string }> {
   if (!Number.isInteger(eventId) || eventId <= 0) return { error: 'Bad event id.' };
-  return asOwner(async () => {
-  const event = await loadAuditableEvent(eventId);
-  if (!event) return { error: 'Event not found.' };
+  return withAdminOrError(async () => {
+    const event = await loadAuditableEvent(eventId);
+    if (!event) return { error: 'Event not found.' };
 
-  const finding = auditEvent(event);
-  if (finding.verdict !== 'mismatch' || !finding.expected_english) {
-    // Nothing to correct — most likely someone else already fixed it, or the page
-    // is stale. Say so rather than writing a no-op.
-    return { error: 'That row no longer needs correcting — reload the page.' };
-  }
+    const finding = auditEvent(event);
+    if (finding.verdict !== 'mismatch' || !finding.expected_english) {
+      // Nothing to correct — most likely someone else already fixed it, or the page
+      // is stale. Say so rather than writing a no-op.
+      return { error: 'That row no longer needs correcting — reload the page.' };
+    }
 
-  await setEventEnglishDate(eventId, finding.expected_english);
+    await setEventEnglishDate(eventId, finding.expected_english);
 
-  revalidatePath('/');
-  revalidatePath('/tree');
-  revalidatePath('/timeline');
-  revalidatePath('/admin/dates');
-  return {};
+    revalidatePath('/');
+    revalidatePath('/tree');
+    revalidatePath('/timeline');
+    revalidatePath('/admin/dates');
+    return {};
   });
 }
 
@@ -101,32 +78,32 @@ export async function trustHebrewDateAction(eventId: number): Promise<{ error?: 
  */
 export async function trustEnglishDateAction(eventId: number): Promise<{ error?: string }> {
   if (!Number.isInteger(eventId) || eventId <= 0) return { error: 'Bad event id.' };
-  return asOwner(async () => {
-  const event = await loadAuditableEvent(eventId);
-  if (!event) return { error: 'Event not found.' };
+  return withAdminOrError(async () => {
+    const event = await loadAuditableEvent(eventId);
+    if (!event) return { error: 'Event not found.' };
 
-  const finding = auditEvent(event);
-  if (finding.verdict !== 'mismatch' || !finding.english_falls_on) {
-    return { error: 'That row no longer needs correcting — reload the page.' };
-  }
+    const finding = auditEvent(event);
+    if (finding.verdict !== 'mismatch' || !finding.english_falls_on) {
+      return { error: 'That row no longer needs correcting — reload the page.' };
+    }
 
-  // english_falls_on is "<day> <Month> <hebrewYear>" — rebuild the parts rather
-  // than re-parsing the display string, so the stored value can never inherit a
-  // formatting change.
-  const parts = finding.english_falls_on.split(' ');
-  const day = Number(parts[0]);
-  const month = parts.slice(1, -1).join(' ');
-  const hebrewYear = Number(parts[parts.length - 1]);
-  if (!Number.isInteger(day) || !month || !Number.isInteger(hebrewYear)) {
-    return { error: 'Could not work out the Hebrew date — edit this one by hand.' };
-  }
+    // english_falls_on is "<day> <Month> <hebrewYear>" — rebuild the parts rather
+    // than re-parsing the display string, so the stored value can never inherit a
+    // formatting change.
+    const parts = finding.english_falls_on.split(' ');
+    const day = Number(parts[0]);
+    const month = parts.slice(1, -1).join(' ');
+    const hebrewYear = Number(parts[parts.length - 1]);
+    if (!Number.isInteger(day) || !month || !Number.isInteger(hebrewYear)) {
+      return { error: 'Could not work out the Hebrew date — edit this one by hand.' };
+    }
 
-  await setEventHebrewDate(eventId, day, month, hebrewYear);
+    await setEventHebrewDate(eventId, day, month, hebrewYear);
 
-  revalidatePath('/');
-  revalidatePath('/tree');
-  revalidatePath('/timeline');
-  revalidatePath('/admin/dates');
-  return {};
+    revalidatePath('/');
+    revalidatePath('/tree');
+    revalidatePath('/timeline');
+    revalidatePath('/admin/dates');
+    return {};
   });
 }

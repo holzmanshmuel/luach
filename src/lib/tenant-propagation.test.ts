@@ -8,26 +8,30 @@ import {
 } from '@/lib/tenant';
 
 /**
- * Reproduces the REAL runtime failure (Task 2.6): an auth guard that `await`s
- * (getSession / getMembership) and only THEN calls enterTenant() must leave the
- * tenant visible to its CALLER once the guard's promise resolves.
+ * ⚠️ WHAT THIS FILE DOES AND DOES NOT PROVE — read before trusting it.
  *
- * With `AsyncLocalStorage.enterWith()` alone this fails: enterWith() called after
- * an await binds the store to the callee's async continuation only, so when the
- * guard resolves the caller resumes in its own prior (empty) context — every
- * downstream query() then throws 'No tenant context'.
+ * It tests ONE contract: given a resolver that memoizes per request, a familyId
+ * written to the holder inside an awaited callee is visible to the caller once
+ * that callee resolves, and two requests stay isolated. That contract holds, and
+ * it is worth keeping — a RENDER really does behave this way.
  *
- * The fix is a request-scoped MUTABLE holder (via React cache() in production).
- * `cache()` memoizes per request/render pass, so a value written to the holder
- * inside an awaited callee is visible to the caller after it resolves, AND a
- * fresh holder per request keeps two requests isolated.
+ * It does NOT exercise the production Server Action path, because the resolver it
+ * memoizes with is a STAND-IN this file injects (`__setRequestHolderResolver`),
+ * not React's `cache()`. The real `cache()` memoizes during an RSC RENDER PASS
+ * only. Inside a Server Action it is a pass-through returning a fresh object per
+ * call, so the holder write lands on an object nobody reads and the caller resumes
+ * with no tenant — exactly the "No tenant context: query() called without an
+ * active family." that broke every add/edit/delete in the app while every page
+ * rendered fine. THIS FILE PASSED THROUGHOUT. It asserted the design contract,
+ * never the runtime.
  *
- * In the node test environment the public `react` `cache()` export is a
- * pass-through (the memoizing implementation is injected by Next's RSC runtime
- * at request time), so we drive the SAME per-request-memoization contract here
- * via an injectable holder resolver — a Map-backed scope run through
- * AsyncLocalStorage, exactly the shape Next's server runtime provides. This lets
- * the test exercise the holder path faithfully without a full React render.
+ * The runtime is covered by `tenant-runtime.test.ts`, which runs a guard → await →
+ * real tenant-scoped `query()` against a real Postgres with no render in scope,
+ * and asserts both directions: through the wrapper it writes the row, and without
+ * the wrapper it throws.
+ *
+ * The general lesson, since this cost a production outage: a test that injects a
+ * stand-in for the mechanism under test cannot fail the way production fails.
  */
 
 // A per-"request" scope: one Map per request, so cache()-style memoization
@@ -40,8 +44,9 @@ function withRequest<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 beforeEach(() => {
-  // Point tenant.ts's holder at our test-driven per-request memoization,
-  // mimicking what React cache() does inside a real request.
+  // Point tenant.ts's holder at our test-driven per-request memoization, which
+  // mimics what React cache() does inside a real RENDER — and, crucially, NOT
+  // what it does inside a Server Action (see the file header).
   __setRequestHolderResolver(<H>(factory: () => H): H => {
     const store = requestScope.getStore();
     if (!store) {
@@ -58,7 +63,7 @@ afterEach(() => {
   __resetRequestHolderResolver();
 });
 
-describe('tenant context survives guard boundaries', () => {
+describe('holder contract: a per-request memoized holder survives guard boundaries', () => {
   it('propagation: enterTenant() after an await is visible to the caller once the callee resolves', async () => {
     // Mimic an auth guard: it awaits (getSession/getMembership), THEN enters tenant.
     async function guard(): Promise<void> {
@@ -69,7 +74,9 @@ describe('tenant context survives guard boundaries', () => {
     await withRequest(async () => {
       expect(getFamilyId()).toBeNull(); // no tenant before the guard runs
       await guard();
-      // THE BUG: with enterWith() alone this is null here (context lost on return).
+      // With enterWith() alone this is null here (context lost on return); it is
+      // 42 only because the injected resolver memoizes the holder, as a render
+      // does. A Server Action gets the null — hence runWithTenant().
       expect(getFamilyId()).toBe(42);
     });
   });
