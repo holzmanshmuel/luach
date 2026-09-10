@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, systemQuery } from '@/lib/db';
 import { runWithTenant } from '@/lib/tenant';
-import { EventWithMember, Gathering, gatheringIcon } from '@/lib/types';
-import { hebrewToGregorianAll, yearsSince } from '@/lib/hebrew';
+import { Gathering } from '@/lib/types';
 import { safeEqual } from '@/lib/safe-equal';
-import { fullName } from '@/lib/names';
-import { oneLine } from '@/lib/text';
 import { configuredSiteUrl } from '@/lib/base-url';
+import { collectItems, memberRecipients, type DigestEventRow } from '@/lib/digest';
+import { fmtShortDay, ymd } from '@/lib/zoned-day';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,44 +17,16 @@ export const dynamic = 'force-dynamic';
  * Designed to be the single source of truth: n8n only schedules, fetches this,
  * and fans the message out to `recipients`. Adding more family phone numbers in
  * the app automatically widens the audience with no workflow change.
+ *
+ * The event shaping, line formatting and recipient list live in `lib/digest.ts`,
+ * shared with `/api/digest/daily` — the newer single-morning-job feed — so the
+ * two speak with one voice. The output of THIS route is unchanged and live n8n
+ * workflows depend on it: keep it byte-identical.
  */
-
-interface MemberEvent extends EventWithMember {
-  phone_e164: string | null;
-  notifications_enabled: boolean;
-}
-
-interface DigestItem {
-  date: Date;
-  icon: string;
-  text: string;
-}
 
 function startOfToday(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function fmtDay(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-/** Local YYYY-MM-DD (toISOString would shift by the timezone offset). */
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function ordinal(n: number): string {
-  const m = n % 100;
-  if (m >= 11 && m <= 13) return `${n}th`;
-  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
-}
-
-function solarInYear(year: number, month: number, day: number): Date {
-  const d = new Date(year, month, day);
-  d.setHours(0, 0, 0, 0);
-  if (d.getMonth() !== month) { const last = new Date(year, month + 1, 0); last.setHours(0, 0, 0, 0); return last; }
   return d;
 }
 
@@ -101,10 +72,8 @@ export async function GET(request: NextRequest) {
     const end = new Date(today);
     end.setDate(end.getDate() + 7); // next 7 days inclusive of today
 
-    const inWindow = (d: Date) => d >= today && d <= end;
-
     const [rows, gatherings] = await Promise.all([
-      query<MemberEvent>(`
+      query<DigestEventRow>(`
         SELECT e.*, fm.name, fm.last_name, fm.family_branch, fm.nickname, fm.photo_url,
                fm.phone_e164, fm.notifications_enabled
         FROM family_calendar.events e
@@ -118,70 +87,24 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
-    const items: DigestItem[] = [];
-    const seen = new Set<string>();
+    // One line per person+occasion in the week (a birthday whose Hebrew and
+    // English occurrences both land in the window is listed once), Hebrew and
+    // fixed-Gregorian occurrences both considered, user-editable text collapsed
+    // to a single line — all of it in collectItems().
+    const items = collectItems({
+      events: rows,
+      gatherings,
+      from: today,
+      to: end,
+      years: [today.getFullYear(), today.getFullYear() + 1],
+    });
 
-    for (const row of rows) {
-      const typeIcon = row.event_type === 'birthday' ? '🎂'
-        : row.event_type === 'anniversary' ? '💍'
-        : row.event_type === 'yahrtzeit' ? '🕯️' : '📅';
-
-      const push = (d: Date) => {
-        if (!inWindow(d)) return;
-        // One line per person+occasion in the week: if a birthday's Hebrew and English
-        // occurrences both fall in the window, don't list the same person twice.
-        const key = `${row.id}-${row.event_type}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const years = yearsSince(d, row); // Hebrew-year count (correct across Jan 1)
-        const noun = row.event_type === 'birthday' ? 'birthday'
-          : row.event_type === 'anniversary' ? 'anniversary'
-          : row.event_type === 'yahrtzeit' ? 'yahrzeit'
-          : (row.event_type_label || 'event');
-        const yPrefix = years && years > 0 && row.event_type !== 'other' ? `${ordinal(years)} ` : '';
-        // Sanitize user-controlled fields (member name, custom event label) so a
-        // smuggled newline can't inject extra spoofed lines into the broadcast.
-        items.push({ date: d, icon: typeIcon, text: `${oneLine(fullName(row))}'s ${yPrefix}${oneLine(noun)}` });
-      };
-
-      // Hebrew-calendar occurrence(s) — this year and next, and ALL occurrences per
-      // year (a Hebrew date can fall twice near the Dec/Jan boundary).
-      for (const y of [today.getFullYear(), today.getFullYear() + 1]) {
-        for (const d of hebrewToGregorianAll(row.hebrew_day, row.hebrew_month, y)) push(d);
-      }
-      // Fixed-Gregorian birthday occurrence
-      if (row.event_type === 'birthday' && row.original_english_date) {
-        const orig = new Date(row.original_english_date + 'T12:00:00Z');
-        for (const y of [today.getFullYear(), today.getFullYear() + 1]) {
-          push(solarInYear(y, orig.getUTCMonth(), orig.getUTCDate()));
-        }
-      }
-    }
-
-    for (const g of gatherings) {
-      const [gy, gm, gd] = g.gather_date.split('-').map(Number);
-      const d = new Date(gy, gm - 1, gd); d.setHours(0, 0, 0, 0);
-      if (!inWindow(d)) continue;
-      // Gathering title/location are user-editable — collapse control chars so a
-      // smuggled newline can't inject extra spoofed lines into the broadcast.
-      let label = oneLine(g.title);
-      if (g.gather_time) {
-        const [h, mn] = g.gather_time.split(':').map(Number);
-        const ampm = h < 12 ? 'AM' : 'PM';
-        label += ` · ${h % 12 === 0 ? 12 : h % 12}:${String(mn).padStart(2, '0')} ${ampm}`;
-      }
-      if (g.location) label += ` (${oneLine(g.location)})`;
-      items.push({ date: d, icon: gatheringIcon(g.kind), text: label });
-    }
-
-    items.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    const rangeLabel = `${fmtDay(today)} – ${fmtDay(end)}`;
+    const rangeLabel = `${fmtShortDay(today)} – ${fmtShortDay(end)}`;
     let message: string;
     if (items.length === 0) {
       message = `🗓️ *This week in the family* (${rangeLabel})\n\nNothing on the calendar this week. ${siteUrl}`;
     } else {
-      const lines = items.map(it => `${it.icon} ${fmtDay(it.date)} — ${it.text}`);
+      const lines = items.map(it => `${it.icon} ${fmtShortDay(it.on)} — ${it.text}`);
       message = `🗓️ *This week in the family* (${rangeLabel})\n\n${lines.join('\n')}\n\nSee it all 👉 ${siteUrl}`;
     }
 
@@ -190,16 +113,13 @@ export async function GET(request: NextRequest) {
     //     the app's Edit-person form) — the self-service path for relatives.
     //  2. The DIGEST_RECIPIENTS env list (comma-separated) — for people who should
     //     get the digest but aren't members of this tree (e.g. the maintainer).
+    //
+    // Source 2 is deployment-wide, so on a multi-family instance it puts the
+    // operator on EVERY family's digest. Kept here because self-hosters' running
+    // workflows rely on it; the newer /api/digest/daily deliberately omits it.
     const envRecipients = (process.env.DIGEST_RECIPIENTS ?? '')
       .split(',').map(s => s.trim()).filter(Boolean);
-    const recipients = [
-      ...new Set([
-        ...rows
-          .filter(r => r.notifications_enabled && r.phone_e164 && r.phone_e164.trim())
-          .map(r => r.phone_e164!.trim()),
-        ...envRecipients,
-      ]),
-    ];
+    const recipients = [...new Set([...memberRecipients(rows), ...envRecipients])];
 
     return NextResponse.json({
       range: { start: ymd(today), end: ymd(end) },
