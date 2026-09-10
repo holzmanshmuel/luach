@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { query } from '@/lib/db';
-import { requireAdmin } from '@/lib/auth';
+import { getSession, requireAdmin } from '@/lib/auth';
+import { runWithTenant } from '@/lib/tenant';
 import { auditEvent, type AuditableEvent } from '@/lib/date-consistency';
 
 /**
@@ -19,6 +20,33 @@ import { auditEvent, type AuditableEvent } from '@/lib/date-consistency';
  * before query() runs, so the WHERE clauses below cannot reach another family's
  * rows even with a guessed id — RLS drops them.
  */
+
+/**
+ * Run `fn` as the verified owner of the caller's family, with tenant context that
+ * actually survives into it.
+ *
+ * ── WHY NOT JUST `await requireAdmin()` ──
+ * `requireAdmin()` ends by calling `enterTenant()`, which is enough for a PAGE
+ * (a React render memoizes the request-scoped holder, so the value survives the
+ * guard resolving back to its caller). It is NOT enough inside a Server Action:
+ * there, `React.cache()` does not memoize the holder and `enterWith()` is lost
+ * when the awaited guard resolves — so the very next `query()` throws
+ * "No tenant context: query() called without an active family."
+ *
+ * That asymmetry is why every page rendered perfectly while every edit in the app
+ * failed. `runWithTenant()` uses `AsyncLocalStorage.run()`, which wraps the
+ * callback unambiguously, so the context is present for everything inside it.
+ */
+async function asOwner<T>(fn: () => Promise<T>): Promise<T | { error: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: 'Admin access required.' };
+  }
+  const { familyId } = await getSession();
+  if (!familyId) return { error: 'Admin access required.' };
+  return runWithTenant(familyId, fn);
+}
 
 /** Load one event in the caller's family, shaped for the audit. Null if not theirs. */
 async function loadAuditableEvent(eventId: number): Promise<AuditableEvent | null> {
@@ -43,13 +71,8 @@ async function loadAuditableEvent(eventId: number): Promise<AuditableEvent | nul
  * family memory and the English one from a mistyped spreadsheet cell.
  */
 export async function trustHebrewDateAction(eventId: number): Promise<{ error?: string }> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { error: 'Admin access required.' };
-  }
   if (!Number.isInteger(eventId) || eventId <= 0) return { error: 'Bad event id.' };
-
+  return asOwner(async () => {
   const event = await loadAuditableEvent(eventId);
   if (!event) return { error: 'Event not found.' };
 
@@ -75,6 +98,7 @@ export async function trustHebrewDateAction(eventId: number): Promise<{ error?: 
   revalidatePath('/timeline');
   revalidatePath('/admin/dates');
   return {};
+  });
 }
 
 /**
@@ -83,13 +107,8 @@ export async function trustHebrewDateAction(eventId: number): Promise<{ error?: 
  * a birth certificate and whose Hebrew dates were worked out later by hand.
  */
 export async function trustEnglishDateAction(eventId: number): Promise<{ error?: string }> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { error: 'Admin access required.' };
-  }
   if (!Number.isInteger(eventId) || eventId <= 0) return { error: 'Bad event id.' };
-
+  return asOwner(async () => {
   const event = await loadAuditableEvent(eventId);
   if (!event) return { error: 'Event not found.' };
 
@@ -124,4 +143,5 @@ export async function trustEnglishDateAction(eventId: number): Promise<{ error?:
   revalidatePath('/timeline');
   revalidatePath('/admin/dates');
   return {};
+  });
 }
