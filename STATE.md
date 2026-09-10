@@ -45,6 +45,40 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Log
 
+### 2026-09-10 — one morning digest replaces two crons (`/api/digest/daily`)
+
+- **`GET /api/digest/daily?family=<id>`** returns a ready-to-send WhatsApp body plus
+  recipients, assembled from up to three blocks (empty ones omitted; all empty ⇒
+  `has_content: false` and the workflow sends nothing):
+  **Today** · **Tonight begins** · **Later in the week** (Sundays only, tomorrow→Saturday,
+  de-duplicated against the first two).
+- ⚠ **"Tonight begins" is not optional.** A yahrzeit and its candle start at sundown, so a
+  naive "today's events" digest would tell people the morning AFTER the candle should have
+  been lit. That block carries the retired yahrzeit reminder's eve-before (`lead=1`)
+  semantics; deleting it is a regression, not a simplification.
+- **Multi-tenancy leak closed.** The three legacy feeds add the deployment-wide
+  `DIGEST_RECIPIENTS` env list to EVERY family's recipients — correct with one family,
+  wrong the moment a second exists, since the operator then receives another family's
+  private dates. The new route reads only per-family members with a phone +
+  `notifications_enabled`, and never reads that env var. `DIGEST_RECIPIENTS` is now
+  documented as legacy.
+- ⚠ **Nobody in the reference deployment has a phone number stored** (all members have
+  `notifications_enabled` defaulted true, zero have `phone_e164`), so today the only
+  recipient is the env var. **Verify `recipients` is non-empty before retiring the old
+  schedules**, or the new job sends to nobody.
+- New libs, all pure and unit-tested: `zoned-day.ts` (civil-day reckoning in the
+  deployment `TZ`), `digest.ts` (icons, phrasing, occurrence windowing, dedup,
+  recipients), `digest-daily.ts` (the assembler). `digest/week` and `reminders/yahrzeit`
+  were refactored onto the shared helpers with byte-identical output;
+  `api/events/today` was left alone.
+- 🪤 **No `toISOString()` anywhere in this path.** Civil dates ride on local-**noon**
+  carriers and compare as `YYYY-MM-DD` strings, so neither DST nor a midnight boundary can
+  shift a day. The new files were run under four host zones (UTC, Los Angeles, Auckland,
+  Kolkata) with identical results, so CI's zone cannot matter.
+- Suite after merge: **32 files / 349 tests, 0 skipped.** The one to watch on any future
+  change here is `src/app/api/broadcast-site-url.test.ts` — it asserts message CONTENT for
+  both refactored legacy routes, and it is DB-backed.
+
 ### 2026-09-10 — owner lock-out on re-redeeming your own invite (live bug)
 
 - **An owner who clicked their own invite link lost their admin pages.**
