@@ -17,10 +17,10 @@
  * have entered your own family — or point this at a throwaway family id and keep
  * it around as a demo.
  *
- * The branch values here ('Levi', 'Cohen') are the DEFAULT branch list, so run
- * this with `FAMILY_BRANCHES` unset (or set to the default) if you want the demo
- * people colour-coded. Under a different list they still seed fine, they just
- * render in the neutral tint like any other unrecognised branch.
+ * The demo family stores its OWN branch list (`families.branches` — see
+ * DEMO_BRANCHES below and migrate-v14), so its people are colour-coded no matter
+ * what `FAMILY_BRANCHES` is set to on this deployment. Nothing here depends on
+ * the environment any more.
  *
  * Usage:
  *   DATABASE_URL="postgres://app_user:...@localhost:5432/family_calendar" \
@@ -36,6 +36,11 @@ import { createHash, randomBytes } from 'crypto';
 
 const FAMILY_NAME = 'The Levi Family';
 const FAMILY_NAME_HE = 'משפחת לוי';
+
+// The demo family's own branch list, stored on its row. Matches the branch values
+// the people below carry, with the catch-all LAST (its position is what makes it
+// the catch-all — see src/lib/branches.ts).
+const DEMO_BRANCHES = ['Levi', 'Cohen', 'Mizrahi', 'Adler', 'Other'];
 
 const url = process.env.DATABASE_URL ?? '';
 if (!url) {
@@ -171,9 +176,12 @@ async function main() {
     familyId = found.rows[0].id;
     console.log(`Family "${FAMILY_NAME}" already exists (id ${familyId}) — topping it up.\n`);
   } else {
+    // `branches` is set explicitly (migrate-v14) so the demo family carries its
+    // OWN list and its people are colour-coded whatever `FAMILY_BRANCHES` says on
+    // this deployment. Every other family stays NULL and inherits the default.
     const created = await client.query<{ id: number }>(
-      'INSERT INTO family_calendar.families (name, name_he) VALUES ($1, $2) RETURNING id',
-      [FAMILY_NAME, FAMILY_NAME_HE]
+      'INSERT INTO family_calendar.families (name, name_he, branches) VALUES ($1, $2, $3) RETURNING id',
+      [FAMILY_NAME, FAMILY_NAME_HE, DEMO_BRANCHES]
     );
     familyId = created.rows[0].id;
     console.log(`Created family "${FAMILY_NAME}" (id ${familyId}).\n`);

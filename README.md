@@ -129,7 +129,7 @@ Fill it in — `.env.example` documents each variable:
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | yes | Google OAuth 2.0 "Web application" client |
 | `OAUTH_REDIRECT_URI` | yes | `https://<your-domain>/api/auth/google/callback`, registered identically in the Google console |
 | `NEXTAUTH_URL` | in prod | Your public origin, used to build invite and feed URLs. The WhatsApp broadcast feeds **500 rather than guess** if it is unset — there is no default |
-| `FAMILY_BRANCHES` | optional | Your family's branch surnames, comma-separated — see [Family branches](#family-branches). Unset = the demo family's |
+| `FAMILY_BRANCHES` | optional | **Fallback** branch surnames, comma-separated, for families that haven't set their own — see [Family branches](#family-branches). Unset = the demo family's |
 | `N8N_TOKEN` | optional | Bearer token for the automation feeds — **a deployment secret; it reads across families** |
 | `DIGEST_RECIPIENTS` | optional | Extra comma-separated E.164 numbers for digests |
 
@@ -137,16 +137,33 @@ Fill it in — `.env.example` documents each variable:
 
 A "branch" is a side of the family — usually a surname. Luach tints avatars,
 tree cards and timeline entries by branch, and each viewer can pick their
-preferred spelling of each branch surname. Set yours in the environment; no code
-changes:
+preferred spelling of each branch surname.
+
+**Each family owns its own list.** Luach is multi-tenant, so the branch list is
+per-family data (`families.branches`), not a deployment-wide setting: the owner
+of a family edits it in the app at **`/admin/branches`** (the 🌿 Branches link in
+the header, owner-only). Two unrelated families on one deployment therefore see
+two different sets of branch chips.
+
+`FAMILY_BRANCHES` is the **fallback** for families that have never set a list of
+their own — which is every family until someone opens that page. It is what makes
+a single-family self-hosted install work with no setup at all:
 
 ```bash
 FAMILY_BRANCHES="Levi,Cohen,Mizrahi,Adler,Other"
 ```
 
-Leave it unset and you get that fictional demo list.
+The resolution order is:
 
-Two rules:
+1. the family's own stored list (`/admin/branches`)
+2. the `FAMILY_BRANCHES` environment variable
+3. the built-in fictional demo list
+
+So upgrading changes nothing: `migrate-v14` adds the column and deliberately
+leaves it NULL on every existing family, and only a family that actively saves
+its own list stops following the environment.
+
+Two rules — the admin page explains both, and warns before you break either:
 
 - **Keep a catch-all LAST.** The final entry is the "no particular branch"
   bucket. It is drawn in a neutral tint, it is where the CSV importer files
@@ -160,9 +177,10 @@ Two rules:
   place keeps its colour, but does not rewrite the value stored on existing
   people; edit those in the app (or with SQL) if you want them to move.
 
-You can list more or fewer than five. Beyond the built-in palette (four named
-branches plus the neutral catch-all) colours repeat from the start; add entries
-to `BRANCH_STYLES` in `src/lib/branches.ts` if you'd rather they didn't.
+The built-in palette has **eight** tints, so up to eight named branches plus the
+neutral catch-all are all distinct. Past that, colours repeat from the start; add
+entries to `BRANCH_STYLES` in `src/lib/branches.ts` if you need more (append —
+the existing entries are positional and must not move).
 
 Branch values already in the database that are **not** in your current list
 don't break anything — those people render in the neutral tint, keep their
@@ -215,7 +233,8 @@ that takes a container. Set the same environment variables as secrets, point
 
 A few places carry the reference deployment's identity rather than yours:
 
-- Branch surnames are the `FAMILY_BRANCHES` environment variable — see
+- Branch surnames are per-family data, edited at `/admin/branches`, with the
+  `FAMILY_BRANCHES` environment variable as the fallback — see
   [Family branches](#family-branches). No code change needed.
 - `src/app/(marketing)/privacy/page.tsx` and
   `src/app/components/BuiltByHolzman.tsx` — the privacy policy and footer name

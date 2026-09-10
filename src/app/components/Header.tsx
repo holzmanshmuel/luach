@@ -64,6 +64,18 @@ export function Header({
             <span aria-hidden>א</span><span className="hidden sm:inline">{t('nav.hebrew_names')}</span>
           </Link>
         )}
+        {/* Owner-only, like the two above. Hardcoded English (no t() key): the
+            /admin pages it leads to are English-only, and adding keys here would
+            put a merge conflict in translations.ts for no user-visible gain. */}
+        {isAdmin && (
+          <Link
+            href="/admin/branches"
+            className="label hover:text-ink flex items-center gap-1.5 transition-colors"
+            title="Family branches"
+          >
+            <span aria-hidden>🌿</span><span className="hidden sm:inline">Branches</span>
+          </Link>
+        )}
         <SubscribeModal label={t('nav.subscribe')} />
         {/* Plain <a>, NOT <Link>: Next prefetches <Link> hrefs, and prefetching
             this destructive GET endpoint silently logs the user out on page load. */}

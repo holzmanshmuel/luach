@@ -30,7 +30,7 @@ describe('buildVariants', () => {
   });
 
   it('keeps a stored spelling whose branch is no longer configured', () => {
-    // Someone renamed a branch in FAMILY_BRANCHES; the spellings row survives
+    // Someone renamed a branch in the family's list; the spellings row survives
     // rather than silently disappearing from the viewer's options.
     const v = buildVariants(['Alpha', 'Elsewhere'], [{ branch: 'Retired', spelling: 'Retyred' }]);
     expect(v.Retired).toEqual(['Retired', 'Retyred']);

@@ -30,9 +30,10 @@ export default async function TimelinePage() {
   const cookieStore = await cookies();
   const lang: Lang = cookieStore.get('lang')?.value === 'he' ? 'he' : 'en';
   const t = getT(lang);
-  // Configured branch list — the accent stripe is chosen by a branch's POSITION
-  // in it (see lib/branches.ts).
-  const branches = familyBranches();
+  // This family's branch list — the accent stripe is chosen by a branch's
+  // POSITION in it (see lib/branches.ts). requireAuth() above entered the tenant,
+  // so this resolves the active family's own list.
+  const branches = await familyBranches();
 
   let entries: TimelineEntry[];
   if (combined) {
