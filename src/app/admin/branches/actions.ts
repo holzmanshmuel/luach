@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth';
-import { setFamilyBranches, validateBranchList } from '@/lib/branches-server';
+import { isUndefinedColumn, setFamilyBranches, validateBranchList } from '@/lib/branches-server';
 
 /**
  * Replace the active family's branch list with `next`, in order.
@@ -31,7 +31,25 @@ export async function saveBranchesAction(
   const checked = validateBranchList(next);
   if ('error' in checked) return { error: checked.error };
 
-  const branches = await setFamilyBranches(checked.branches);
+  let branches: string[];
+  try {
+    branches = await setFamilyBranches(checked.branches);
+  } catch (err) {
+    // The READ tolerates a database that predates migrate-v14 by falling back to
+    // the deployment's list, so this page renders and is usable before the
+    // migration has been run. The WRITE cannot fall back — there is nowhere to
+    // put the list — so say that in words instead of throwing a 500 at someone
+    // who has just spent a minute typing their family's surnames.
+    if (isUndefinedColumn(err)) {
+      return {
+        error:
+          'This calendar\'s database has not been updated for per-family branches yet, ' +
+          'so the list cannot be saved. Nothing was lost — whoever runs this Luach needs ' +
+          'to apply the pending database migration, then this page will work.',
+      };
+    }
+    throw err;
+  }
 
   // Branch colours and chips appear on every surface, and the branch list also
   // gates which branches can carry alternate spellings.
