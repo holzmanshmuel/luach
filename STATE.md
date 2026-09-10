@@ -38,7 +38,7 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 - Four local branches still exist but are **all already merged into main** — stale refs, no
   unmerged work: `chore/parse-hebrew-date-0.2.0`, `holzmanshmuel/holzman-152-welcome-signin-affordance`,
   `holzmanshmuel/holzman-63-ical-feed-i18n`, `tools/parser-drift-audit`.
-- Tests: vitest, 34 test files / 409 tests, 10 of which hit a real Postgres. CI
+- Tests: vitest, 34 test files / 414 tests, 10 of which hit a real Postgres. CI
   (`.github/workflows/ci.yml`) runs on push to main + PRs against a throwaway `postgres:16` service
   container and uses **no GitHub secrets** on purpose, so a fork's CI runs unmodified: migrate →
   create+grant restricted role → assert not superuser/bypassrls → lint → build → `tsc --noEmit` →
@@ -77,12 +77,18 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 - **`GET /api/digest/daily?family=<id>`** returns a ready-to-send WhatsApp body plus
   recipients, assembled from up to three blocks (empty ones omitted; all empty ⇒
   `has_content: false` and the workflow sends nothing):
-  **Today** · **Tonight begins** · **Later in the week** (Sundays only, tomorrow→Saturday,
-  de-duplicated against the first two).
+  **Today** · **Tonight begins** · **Later in the week** (Sundays only, tomorrow→Saturday) ·
+  **A yahrzeit is a week away** (exactly 7 days out), all sharing one de-dup set.
 - ⚠ **"Tonight begins" is not optional.** A yahrzeit and its candle start at sundown, so a
   naive "today's events" digest would tell people the morning AFTER the candle should have
   been lit. That block carries the retired yahrzeit reminder's eve-before (`lead=1`)
   semantics; deleting it is a regression, not a simplification.
+- ⚠ **The retired yahrzeit cron ran TWICE a day**, not once: `lead=1` for tonight's candle
+  AND `lead=7` for a week's notice. The first consolidation folded in only the eve-before,
+  which would have deleted the week-ahead notice the moment the old schedule was switched
+  off — caught while checking the old workflow's nodes, not from the route's own docs.
+  **When collapsing jobs, enumerate what the OLD schedule actually calls; a workflow can
+  hit the same endpoint more than once with different parameters.**
 - **Multi-tenancy leak closed.** The three legacy feeds add the deployment-wide
   `DIGEST_RECIPIENTS` env list to EVERY family's recipients — correct with one family,
   wrong the moment a second exists, since the operator then receives another family's

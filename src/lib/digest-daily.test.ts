@@ -35,7 +35,7 @@ describe('the "Today" block', () => {
     expect(d.date).toBe('2026-09-10');
     expect(d.is_sunday).toBe(false);
     expect(d.has_content).toBe(true);
-    expect(d.counts).toEqual({ today: 5, tonight: 0, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 5, tonight: 0, later_this_week: 0, week_ahead: 0 });
     expect(d.message).toBe(
       '🗓️ *Today in the family* — Thursday, September 10\n' +
         '\n' +
@@ -71,7 +71,7 @@ describe('the "Tonight begins" block', () => {
       events: [eventOn(day(2026, 9, 11), { name: 'Yaakov', type: 'yahrtzeit', yearsAgo: 9 })],
     });
 
-    expect(d.counts).toEqual({ today: 0, tonight: 1, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 0, tonight: 1, later_this_week: 0, week_ahead: 0 });
     expect(d.tonight[0]).toMatchObject({
       date: '2026-09-11',
       icon: '🕯️',
@@ -97,7 +97,7 @@ describe('the "Tonight begins" block', () => {
       ],
       gatherings: [gatheringOn('2026-09-11')],
     });
-    expect(d.counts).toEqual({ today: 0, tonight: 1, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 0, tonight: 1, later_this_week: 0, week_ahead: 0 });
     expect(d.tonight[0].text).toBe('Bubby Levi (3rd yahrzeit)');
   });
 
@@ -110,14 +110,14 @@ describe('the "Tonight begins" block', () => {
     });
     expect(d.message.indexOf("Dina Levi's 42nd birthday"))
       .toBeLessThan(d.message.indexOf('Tonight begins'));
-    expect(d.counts).toEqual({ today: 1, tonight: 1, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 1, tonight: 1, later_this_week: 0, week_ahead: 0 });
   });
 
   it('keeps a yahrzeit falling TODAY in the Today block, not tonight\'s', () => {
     const d = digest(THURSDAY, {
       events: [eventOn(day(2026, 9, 10), { name: 'Zeide', type: 'yahrtzeit', yearsAgo: 9 })],
     });
-    expect(d.counts).toEqual({ today: 1, tonight: 0, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 1, tonight: 0, later_this_week: 0, week_ahead: 0 });
     expect(d.today[0].text).toBe("Zeide Levi's 9th yahrzeit");
   });
 });
@@ -135,7 +135,7 @@ describe('the "Later in the week" block — Sundays only', () => {
     });
 
     expect(d.is_sunday).toBe(true);
-    expect(d.counts).toEqual({ today: 2, tonight: 0, later_this_week: 2 });
+    expect(d.counts).toEqual({ today: 2, tonight: 0, later_this_week: 2, week_ahead: 0 });
     expect(d.later_this_week.map(l => l.date)).toEqual(['2026-09-16', '2026-09-19']);
     expect(d.message).toBe(
       '🗓️ *Today in the family* — Sunday, September 13\n' +
@@ -174,7 +174,7 @@ describe('the "Later in the week" block — Sundays only', () => {
     const d = digest(SUNDAY, {
       events: [eventOn(day(2026, 9, 14), { name: 'Yaakov', type: 'yahrtzeit', yearsAgo: 9 })],
     });
-    expect(d.counts).toEqual({ today: 0, tonight: 1, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 0, tonight: 1, later_this_week: 0, week_ahead: 0 });
     expect(d.message).toContain('Tonight begins');
     expect(d.message).not.toContain('Later in the week');
     // The name is said exactly once in the whole broadcast.
@@ -185,7 +185,7 @@ describe('the "Later in the week" block — Sundays only', () => {
     // Hebrew birthday today, fixed civil birthday on Wednesday — one mention.
     const row = eventOn(day(2026, 9, 13), { name: 'Dina', english: '1984-09-16' });
     const d = digest(SUNDAY, { events: [row] });
-    expect(d.counts).toEqual({ today: 1, tonight: 0, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 1, tonight: 0, later_this_week: 0, week_ahead: 0 });
     expect(d.message.match(/Dina Levi/g)).toHaveLength(1);
   });
 
@@ -209,7 +209,7 @@ describe('an empty day', () => {
     expect(d.today).toEqual([]);
     expect(d.tonight).toEqual([]);
     expect(d.later_this_week).toEqual([]);
-    expect(d.counts).toEqual({ today: 0, tonight: 0, later_this_week: 0 });
+    expect(d.counts).toEqual({ today: 0, tonight: 0, later_this_week: 0, week_ahead: 0 });
   });
 
   it('is empty on a Sunday too when the whole week is clear', () => {
@@ -233,14 +233,14 @@ describe('the family/deployment timezone decides "today" and "Sunday"', () => {
 
     expect(jerusalem.date).toBe('2026-09-13');
     expect(jerusalem.is_sunday).toBe(true);
-    expect(jerusalem.counts).toEqual({ today: 1, tonight: 0, later_this_week: 1 });
+    expect(jerusalem.counts).toEqual({ today: 1, tonight: 0, later_this_week: 1, week_ahead: 0 });
 
     // Reckoned in UTC the same instant is still Saturday: Sunday's birthday has
     // not arrived, the Sunday look-ahead does not apply, and the family would be
     // sent nothing at all. This is the bug the zone argument exists to prevent.
     expect(utc.date).toBe('2026-09-12');
     expect(utc.is_sunday).toBe(false);
-    expect(utc.counts).toEqual({ today: 0, tonight: 0, later_this_week: 0 });
+    expect(utc.counts).toEqual({ today: 0, tonight: 0, later_this_week: 0, week_ahead: 0 });
     expect(utc.has_content).toBe(false);
     expect(jerusalem.has_content).toBe(true);
   });
@@ -306,5 +306,56 @@ describe('defaults', () => {
     expect(d.has_content).toBe(false);
     expect(d.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(d.timezone.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the week-ahead yahrzeit notice', () => {
+  // The retired reminder cron ran TWICE daily: lead=1 (candle lit this evening)
+  // and lead=7. Folding in only the eve-before would have quietly deleted the
+  // week's notice the moment the old schedule was switched off — and a week is
+  // the notice people actually arrange a minyan around.
+  it('names a yahrzeit exactly seven days out', () => {
+    const d = digest(THURSDAY, {
+      events: [eventOn(day(2026, 9, 17), { name: 'Bubbe', type: 'yahrtzeit', yearsAgo: 12 })],
+    });
+    expect(d.counts.week_ahead).toBe(1);
+    expect(d.has_content).toBe(true);
+    expect(d.message).toContain('a week away');
+    expect(d.message).toContain('Bubbe');
+  });
+
+  it('ignores yahrzeits six or eight days out — the notice is exact, like the cron', () => {
+    for (const dayOfMonth of [16, 18]) {
+      const d = digest(THURSDAY, {
+        events: [eventOn(day(2026, 9, dayOfMonth), { name: 'Bubbe', type: 'yahrtzeit' })],
+      });
+      expect(d.counts.week_ahead).toBe(0);
+    }
+  });
+
+  it('does not fire for a birthday a week out — yahrzeits only', () => {
+    const d = digest(THURSDAY, {
+      events: [eventOn(day(2026, 9, 17), { name: 'Dina', yearsAgo: 42 })],
+    });
+    expect(d.counts.week_ahead).toBe(0);
+    expect(d.has_content).toBe(false);
+  });
+
+  it('says it once when the Sunday week-view covers the same yahrzeit', () => {
+    // From Sunday the 13th, seven days out is Sunday the 20th — outside the
+    // Mon–Sat week block, so these cannot collide. Assert the shared de-dup set
+    // keeps it that way if either window is ever widened.
+    const d = digest(SUNDAY, {
+      events: [eventOn(day(2026, 9, 20), { name: 'Zeide', type: 'yahrtzeit', yearsAgo: 9 })],
+    });
+    const mentions = d.message.split('Zeide').length - 1;
+    expect(mentions).toBe(1);
+  });
+
+  it('carries the memorial blessing, like the reminder it replaces', () => {
+    const d = digest(THURSDAY, {
+      events: [eventOn(day(2026, 9, 17), { name: 'Bubbe', type: 'yahrtzeit' })],
+    });
+    expect(d.message).toContain('May their memory be a blessing');
   });
 });

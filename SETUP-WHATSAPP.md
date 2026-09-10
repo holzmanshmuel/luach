@@ -120,12 +120,16 @@ left out entirely**:
    **tonight** (i.e. tomorrow's date on the calendar). A yahrzeit and its
    memorial candle start at sundown, so a strictly "today" digest would tell
    people the morning *after* the candle should have been lit. This block is the
-   eve-before reminder, folded in. Yahrzeits further out are not previewed here:
-   on a Sunday they turn up in block 3, and the legacy
-   `/api/reminders/yahrzeit?lead=7` is still there if you want a separate
-   week-ahead heads-up.
+   eve-before reminder, folded in.
 3. **Later in the week:** — **Sundays only**, tomorrow through Saturday,
-   de-duplicated against the first two blocks so nothing is said twice.
+   de-duplicated against the earlier blocks so nothing is said twice.
+4. **A yahrzeit is a week away** — yahrzeits falling **exactly seven days** from
+   today. This is the retired reminder's second daily call (`?lead=7`), folded in
+   too. The old cron ran that endpoint *twice* a day — once at the default
+   `lead=1` for tonight's candle and once at `lead=7` — so carrying over only the
+   eve-before would have silently deleted the week's notice the moment you switch
+   the old schedule off. A week is the notice people actually arrange a minyan
+   around; keep it.
 
 `has_content` is true only when at least one block has something in it. **Gate
 the workflow on it** — on a quiet day the digest deliberately has no message and

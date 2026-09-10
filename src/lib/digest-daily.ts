@@ -59,15 +59,33 @@ export interface DailyDigest {
   is_sunday: boolean;
   /** True iff at least one block has content. The n8n job gates on this. */
   has_content: boolean;
-  counts: { today: number; tonight: number; later_this_week: number };
+  counts: { today: number; tonight: number; later_this_week: number; week_ahead: number };
   today: DigestLine[];
   tonight: DigestLine[];
   later_this_week: DigestLine[];
+  /** Yahrzeits exactly a week out — the retired cron's lead=7 notice. */
+  week_ahead: DigestLine[];
   /** Ready-to-send WhatsApp body, or `''` when there is nothing to say. */
   message: string;
 }
 
 const TONIGHT_HEADING = '🕯️ *Tonight begins* — light a memorial candle at sundown:';
+/**
+ * The week-ahead yahrzeit notice. Carried over from the retired reminder's
+ * `?lead=7` call — see the block comment on WEEK_AHEAD_LEAD_DAYS below.
+ */
+const WEEK_AHEAD_HEADING = '🕯️ *A yahrzeit is a week away:*';
+
+/**
+ * How many days ahead the week-ahead yahrzeit notice looks.
+ *
+ * The retired `reminders/yahrzeit` cron ran TWICE a day: once at the default
+ * `lead=1` (the candle is lit this evening) and once at `lead=7`. Folding only the
+ * eve-before into this digest would have silently dropped the week's notice the
+ * moment the old schedule was switched off — and a week is the point: it is the
+ * notice people actually plan a minyan around.
+ */
+const WEEK_AHEAD_LEAD_DAYS = 7;
 const MEMORY_BLESSING = 'May their memory be a blessing. 🤍';
 const LATER_HEADING = '*Later in the week:*';
 
@@ -92,6 +110,13 @@ export function buildDailyDigest(input: DailyDigestInput): DailyDigest {
     events, from: tomorrow, to: tomorrow, years, seen,
     eventTypes: ['yahrtzeit'], style: 'memorial',
   });
+  // Exactly `WEEK_AHEAD_LEAD_DAYS` out, matching the retired cron's lead=7 call.
+  // Threaded through the same `seen` set, so on a Sunday a yahrzeit that also
+  // falls inside "Later in the week" is named once, not twice.
+  const weekAheadItems = collectItems({
+    events, from: addDays(today, WEEK_AHEAD_LEAD_DAYS), to: addDays(today, WEEK_AHEAD_LEAD_DAYS),
+    years, seen, eventTypes: ['yahrtzeit'], style: 'memorial',
+  });
   const laterItems = isSunday(today)
     ? collectItems({
         events, gatherings, from: tomorrow, to: saturdayOfWeek(today), years, seen,
@@ -102,16 +127,19 @@ export function buildDailyDigest(input: DailyDigestInput): DailyDigest {
     date: ymd(today),
     timezone: timeZone,
     is_sunday: isSunday(today),
-    has_content: todayItems.length + tonightItems.length + laterItems.length > 0,
+    has_content:
+      todayItems.length + tonightItems.length + laterItems.length + weekAheadItems.length > 0,
     counts: {
       today: todayItems.length,
       tonight: tonightItems.length,
       later_this_week: laterItems.length,
+      week_ahead: weekAheadItems.length,
     },
     today: todayItems.map(toLine),
     tonight: tonightItems.map(toLine),
     later_this_week: laterItems.map(toLine),
-    message: buildMessage(today, todayItems, tonightItems, laterItems, siteUrl),
+    week_ahead: weekAheadItems.map(toLine),
+    message: buildMessage(today, todayItems, tonightItems, laterItems, weekAheadItems, siteUrl),
   };
 }
 
@@ -124,6 +152,7 @@ function buildMessage(
   todayItems: DigestItem[],
   tonightItems: DigestItem[],
   laterItems: DigestItem[],
+  weekAheadItems: DigestItem[],
   siteUrl: string
 ): string {
   const blocks: string[] = [];
@@ -144,6 +173,14 @@ function buildMessage(
     blocks.push([
       LATER_HEADING,
       ...laterItems.map(it => `${it.icon} ${fmtShortDay(it.on)} — ${it.text}`),
+    ].join('\n'));
+  }
+
+  if (weekAheadItems.length > 0) {
+    blocks.push([
+      WEEK_AHEAD_HEADING,
+      ...weekAheadItems.map(it => `${it.icon} ${fmtShortDay(it.on)} — ${it.text}`),
+      MEMORY_BLESSING,
     ].join('\n'));
   }
 
