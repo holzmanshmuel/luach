@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { query } from '@/lib/db';
 import { getSession, requireAdmin } from '@/lib/auth';
 import { runWithTenant } from '@/lib/tenant';
+import { setEventEnglishDate, setEventHebrewDate } from '@/lib/date-corrections';
 import { auditEvent, type AuditableEvent } from '@/lib/date-consistency';
 
 /**
@@ -83,15 +84,7 @@ export async function trustHebrewDateAction(eventId: number): Promise<{ error?: 
     return { error: 'That row no longer needs correcting — reload the page.' };
   }
 
-  const newYear = Number(finding.expected_english.slice(0, 4));
-  await query(
-    `UPDATE family_calendar.events
-        SET original_english_date = $1,
-            gregorian_year = CASE WHEN gregorian_year IS NULL THEN NULL ELSE $2 END,
-            updated_at = NOW()
-      WHERE id = $3`,
-    [finding.expected_english, newYear, eventId]
-  );
+  await setEventEnglishDate(eventId, finding.expected_english);
 
   revalidatePath('/');
   revalidatePath('/tree');
@@ -128,15 +121,7 @@ export async function trustEnglishDateAction(eventId: number): Promise<{ error?:
     return { error: 'Could not work out the Hebrew date — edit this one by hand.' };
   }
 
-  await query(
-    `UPDATE family_calendar.events
-        SET hebrew_day = $1,
-            hebrew_month = $2,
-            hebrew_year = CASE WHEN hebrew_year IS NULL THEN NULL ELSE $3 END,
-            updated_at = NOW()
-      WHERE id = $4`,
-    [day, month, hebrewYear, eventId]
-  );
+  await setEventHebrewDate(eventId, day, month, hebrewYear);
 
   revalidatePath('/');
   revalidatePath('/tree');
