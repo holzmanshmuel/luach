@@ -190,6 +190,14 @@ the digest — the maintainer included — joins the family as a member with a p
 number and nudges enabled (section 1). The two legacy feeds below still honour
 `DIGEST_RECIPIENTS`, because self-hosters' running workflows depend on it.
 
+### ⚠️ Send the token as a header, not in the URL
+
+Every token-gated route also accepts `?token=<N8N_TOKEN>` as a query parameter.
+That is kept for convenience, but **prefer the `Authorization: Bearer` header**:
+a query string is written to proxy and server access logs, kept in browser
+history, and sent onward in a `Referer` header. A header is not. The n8n
+workflows in this document all use the header.
+
 ## 4. The legacy feeds (still live)
 
 Three earlier `N8N_TOKEN` feeds remain, unchanged, for deployments whose

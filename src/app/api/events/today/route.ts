@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, systemQuery } from '@/lib/db';
-import { runWithTenant } from '@/lib/tenant';
+import { runWithTenant, isValidFamilyId } from '@/lib/tenant';
 import { EventWithMember } from '@/lib/types';
 import { hebrewToGregorianAll, formatHebrewDate, yearsSince } from '@/lib/hebrew';
 import { safeEqual } from '@/lib/safe-equal';
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
   const familyParam = request.nextUrl.searchParams.get('family');
   const familyId = familyParam ? Number(familyParam) : NaN;
-  if (!familyParam || !Number.isInteger(familyId) || familyId <= 0) {
+  if (!familyParam || !isValidFamilyId(familyId)) {
     return NextResponse.json({ error: 'family parameter required' }, { status: 400 });
   }
 

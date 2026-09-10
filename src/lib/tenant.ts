@@ -92,3 +92,19 @@ export function getFamilyId(): number | null {
 export function runWithTenant<T>(familyId: number, fn: () => Promise<T>): Promise<T> {
   return storage.run({ familyId }, fn);
 }
+
+/**
+ * The largest value a `family_id` can hold: Postgres `integer` is signed 32-bit.
+ *
+ * `Number.isInteger()` happily accepts 9999999999, which then reaches the query
+ * and blows up inside the driver as an uncaught 500 — a malformed request being
+ * reported as a server fault, on every machine-facing route at once. Bounding the
+ * value where it is parsed turns that into the 400 it always was.
+ */
+export const MAX_FAMILY_ID = 2_147_483_647;
+
+/** Is `value` a usable family id — a positive integer inside Postgres' int4 range? */
+export function isValidFamilyId(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value)
+    && value > 0 && value <= MAX_FAMILY_ID;
+}
