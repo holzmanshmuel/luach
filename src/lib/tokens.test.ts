@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { systemQuery, query } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { runWithTenant } from '@/lib/tenant';
 import { createInviteToken, redeemInvite, peekInvite, hashToken } from '@/lib/tokens';
 import { upsertUser } from '@/lib/users';
@@ -36,7 +37,7 @@ async function cleanup(opts: { familyIds?: number[]; userIds?: number[] }) {
   for (const fid of opts.familyIds ?? []) {
     // access_tokens + memberships FK-cascade on family delete; be explicit anyway.
     await systemQuery('DELETE FROM family_calendar.memberships WHERE family_id = $1', [fid]);
-    await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [fid]);
+    await deleteFamilies(fid);
   }
 }
 

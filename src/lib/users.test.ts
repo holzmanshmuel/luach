@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { systemQuery } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import {
   upsertUser,
   getMembershipsForUser,
@@ -86,7 +87,7 @@ describe('createFamilyWithOwner', () => {
         await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
       }
       if (familyId !== null) {
-        await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+        await deleteFamilies(familyId);
       }
     }
   });
@@ -125,7 +126,7 @@ describe('createFamilyWithOwner', () => {
       }
       for (const fid of [firstId, secondId]) {
         if (fid !== null) {
-          await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [fid]);
+          await deleteFamilies(fid);
         }
       }
     }
@@ -154,7 +155,7 @@ describe('createFamilyWithOwner', () => {
         await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
       }
       if (familyId !== null) {
-        await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+        await deleteFamilies(familyId);
       }
     }
   });
@@ -225,10 +226,10 @@ describe('getMembershipsForUser / getMembership', () => {
         await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
       }
       if (familyId !== null) {
-        await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+        await deleteFamilies(familyId);
       }
       if (otherFamilyId !== null) {
-        await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [otherFamilyId]);
+        await deleteFamilies(otherFamilyId);
       }
     }
   });

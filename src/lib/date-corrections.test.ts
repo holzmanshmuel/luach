@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { systemQuery, query } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { runWithTenant } from '@/lib/tenant';
 import { setEventEnglishDate, setEventHebrewDate } from '@/lib/date-corrections';
 
@@ -68,7 +69,7 @@ async function readEvent(familyId: number, eventId: number) {
 }
 
 async function cleanup(familyId: number) {
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+  await deleteFamilies(familyId);
 }
 
 describe('setEventEnglishDate', () => {

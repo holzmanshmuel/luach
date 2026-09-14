@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { systemQuery, query } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { runWithTenant } from '@/lib/tenant';
 import {
   computeViewFamilies,
@@ -148,9 +149,7 @@ describe('aggregation isolation (the gate)', () => {
     // families cascade → family_members → events, and → memberships (v10/v9 FKs);
     // users cascade → any remaining memberships. Only non-RLS deletes are used.
     if (famAId || famBId || famCId) {
-      await systemQuery('DELETE FROM family_calendar.families WHERE id = ANY($1)', [
-        [famAId, famBId, famCId],
-      ]);
+      await deleteFamilies(famAId, famBId, famCId);
     }
     if (userId) {
       await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);

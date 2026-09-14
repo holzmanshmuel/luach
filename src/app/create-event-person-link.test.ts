@@ -43,6 +43,7 @@ vi.mock('next/cache', () => ({
 
 import { getSession } from '@/lib/auth';
 import { query, systemQuery } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { runWithTenant } from '@/lib/tenant';
 import { createEventAction, type EventFormData } from '@/app/actions';
 
@@ -120,7 +121,7 @@ beforeEach(async () => {
 
 afterAll(async () => {
   // families cascade to members, events and memberships.
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+  await deleteFamilies(familyId);
   await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
   cookieJar.clear();
 });

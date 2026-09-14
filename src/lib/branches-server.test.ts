@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import { systemQuery } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { runWithTenant } from '@/lib/tenant';
 import {
   familyBranches,
@@ -52,7 +53,7 @@ async function makeFamily(name: string, branches?: string[]): Promise<number> {
 }
 
 async function dropFamily(id: number): Promise<void> {
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [id]);
+  await deleteFamilies(id);
 }
 
 async function readColumn(id: number): Promise<string[] | null> {
@@ -453,7 +454,7 @@ describe('a new family never inherits the operator’s surnames', () => {
       await expect(familyBranches(family.id)).resolves.toEqual([]);
     } finally {
       await systemQuery('DELETE FROM family_calendar.memberships WHERE family_id = $1', [family.id]);
-      await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [family.id]);
+      await deleteFamilies(family.id);
       await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
     }
   });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { runWithTenant } from '@/lib/tenant';
 import { query, systemQuery } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 
 // Requires DATABASE_URL pointing at a test/dev Postgres with migrations v9+v10 applied.
 describe('tenant isolation', () => {
@@ -24,6 +25,6 @@ describe('tenant isolation', () => {
     expect(bNames.map(r => r.name)).toEqual(['Bob']);
 
     // cleanup
-    await systemQuery('DELETE FROM family_calendar.families WHERE id = ANY($1)', [[a.id, b.id]]);
+    await deleteFamilies(a.id, b.id);
   });
 });

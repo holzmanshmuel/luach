@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { systemQuery, query } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { runWithTenant } from '@/lib/tenant';
 import { gregorianToHebrew } from '@/lib/hebrew';
 import { GET as digestGET } from '@/app/api/digest/week/route';
@@ -58,7 +59,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // family_members/events FK-cascade off families (migrate-v10).
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+  await deleteFamilies(familyId);
 });
 
 afterEach(() => {

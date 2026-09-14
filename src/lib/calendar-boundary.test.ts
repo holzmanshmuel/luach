@@ -32,6 +32,7 @@ vi.mock('next/headers', () => ({
 
 const { systemQuery, query } = await import('@/lib/db');
 const { runWithTenant } = await import('@/lib/tenant');
+const { deleteFamilies } = await import('@/test-stubs/families');
 const {
   getEventsForMonth,
   getEventsForHebrewMonth,
@@ -91,7 +92,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // family_members / events / gatherings FK-cascade off families (migrate-v10).
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+  await deleteFamilies(familyId);
 });
 
 /**
