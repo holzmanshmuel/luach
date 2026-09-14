@@ -26,34 +26,79 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   assigned by list position. Each family owns `families.branches`, edited at `/admin/branches`;
   `FAMILY_BRANCHES` is only the fallback for families that have never set one. Append, never
   insert or reorder. Resolution: family's own list → `FAMILY_BRANCHES` → `DEFAULT_FAMILY_BRANCHES`.
-- Migrations (`scripts/seed.sql`, then `migrate-v2.sql` … `migrate-v14.sql`) are applied **in order**
-  by `scripts/migrate.ts` as schema owner, and are idempotent — safe to re-run after a `git pull`.
-  `migrate.ts` globs `migrate-v*.sql`, so a new migration needs no registration.
-
-- **`FAMILY_BRANCHES` is ordered and load-bearing** — branch colours are assigned by list position.
-  Append, never insert or reorder.
-- Migrations (`scripts/seed.sql`, then `migrate-v2.sql` … `migrate-v15.sql`) are applied **in order**
-  by `scripts/migrate.ts` as schema owner, and are idempotent — safe to re-run after a `git pull`.
+- Migrations (`scripts/seed.sql`, then `migrate-v2.sql` … `migrate-v17.sql`) are applied **in order**
+  by `scripts/migrate.ts` as schema owner, **before** the deploy that needs them, and are idempotent —
+  safe to re-run after a `git pull`. `migrate.ts` globs `migrate-v*.sql`, so a new migration needs no
+  registration.
+- **`families` is written only from inside that family's tenant context** (enforced by the
+  migrate-v17 trigger for every role but the owner). Use the tenant-scoped `query()` with
+  `WHERE id = nullif(current_setting('app.current_family', true), '')::int`; in tests, delete a
+  family with `deleteFamilies()` from `src/test-stubs/families.ts`, never a bare `systemQuery`.
+- **Admin-page copy is translated too.** Server Actions and validators return a `TMessage`
+  (`{ key, params }`), never an English sentence; render with `<Message>` / `<InterpolatedMany>` so
+  each value is `<bdi>`-isolated.
 - **`/join/<token>` must keep that exact URL, forever.** Those links sit in family WhatsApp threads
   and cannot be re-sent. Same for `buildInviteLink` and the `/join/` proxy allowlist entry.
 - n8n is a dumb pipe. Luach is the source of truth; n8n only fans messages out.
 
 ## Where it stands
 
-- `main`, clean, level with `origin/main`. Last commit `2121483` (2026-08-30) — HOLZMAN-152, the
-  sign-in path for returning members on `/welcome`.
-- Four local branches still exist but are **all already merged into main** — stale refs, no
-  unmerged work: `chore/parse-hebrew-date-0.2.0`, `holzmanshmuel/holzman-152-welcome-signin-affordance`,
-  `holzmanshmuel/holzman-63-ical-feed-i18n`, `tools/parser-drift-audit`.
-- Tests: vitest, 40 test files / 473 tests, 12 of which hit a real Postgres. CI
-  (`.github/workflows/ci.yml`) runs on push to main + PRs against a throwaway `postgres:16` service
-  container and uses **no GitHub secrets** on purpose, so a fork's CI runs unmodified: migrate →
-  create+grant restricted role → assert not superuser/bypassrls → lint → build → `tsc --noEmit` →
-  `vitest run`.
-- Scheduled work is external: an n8n cron (`0 8 * * *`, see `SETUP-WHATSAPP.md`) calls the
-  `N8N_TOKEN`-gated routes `/api/events/today`, `/api/digest/week`, `/api/reminders/yahrzeit`.
+- 2026-09-14: HOLZMAN-181 (#2) and HOLZMAN-183 (#4) merged and deployed. **HOLZMAN-182 (#3) is
+  merged only once `migrate-v17` has run on production** — see the 2026-09-14 log entry.
+- Tests: vitest. All three branches trial-merged on a fresh migrated database as the app role:
+  **55 files / 684 tests, 0 skipped**. CI (`.github/workflows/ci.yml`) runs on push to main + PRs
+  against a throwaway `postgres:16` service container and uses **no GitHub secrets** on purpose, so a
+  fork's CI runs unmodified: migrate → create+grant restricted role → assert not superuser/bypassrls
+  → lint → build → `tsc --noEmit` → `vitest run`.
+- Scheduled work is external. On the reference deployment ONE n8n job runs daily at 08:00
+  Asia/Jerusalem and calls `/api/digest/daily` per family (recipients = members with a phone). The
+  legacy `/api/digest/week` and `/api/reminders/yahrzeit` schedules are deactivated, and
+  `DIGEST_RECIPIENTS` is being removed from the hosted service (HOLZMAN-180); self-hosters on the
+  legacy routes can still set it.
 
 ## Log
+
+### 2026-09-14 — a typed name forked people; `families` gets a database backstop; admin pages go bilingual
+
+- **HOLZMAN-181 — adding an occasion by TYPING a name created a duplicate person.**
+  `createEventAction`'s fallback lookup compared the form's full name ("Miriam Cohen") with the
+  given-name column alone, so it never matched anyone who has a surname. It now matches each
+  person's `fullName()` — the form the suggestion list shows — as stored AND as the viewer spells
+  the family's surnames (`idsMatchingFullName()` in `names.ts`, shared with the client's auto-link).
+  🪤 **Two people with one name: neither side guesses.** The action returns `err.person_ambiguous`
+  and writes nothing; the form links on its own only when exactly one person matches. Attaching an
+  occasion to "the first match" would be the same silent wrong answer in a new shape.
+  `create-event-person-link.test.ts` runs the real action against Postgres; 3 of its 6 cases fail on
+  the old code.
+- **HOLZMAN-182 — `migrate-v17`: cross-family writes to `families` are refused by the database.**
+  `families` has no RLS and cannot (it is the tenant list, read pre-auth), so isolation was
+  discipline: a red-team lane overwrote another family's branch list with raw SQL as the app role.
+  A `BEFORE UPDATE OR DELETE` row trigger now lets any role but the OWNER change or delete a row
+  only from inside that family's own tenant context, and never change its id (42501, raised before
+  constraints and before `ON DELETE CASCADE`). SELECT and INSERT are untouched, so the feed-token
+  lookup, invite page and onboarding keep working; the owner stays exempt because migrations rewrite
+  every family. Chosen over a SECURITY DEFINER write function because the one real write path
+  (`setFamilyBranches`) already has this shape — no grants to keep in sync in four places, no app
+  change — and because it covers DELETE, which cascades a whole family.
+  `families-write-guard.test.ts` first asserts the suite is NOT the owner (as the owner every refusal
+  would silently stop happening); with the trigger disabled 8 of its 10 cases fail.
+  🪤 **Under a guard, `rejects.toThrow()` proves nothing.** The feed-token UNIQUE / NOT NULL tests
+  would have kept passing on the guard's 42501 without ever reaching the constraint; they now write
+  from inside the family and assert 23505 / 23502. Assert the SQLSTATE you mean.
+  🪤 **Mutation-checking a guard runs its "refused" writes for real.** Disabling the trigger on the
+  shared local staging database let the test's cross-family UPDATE rename every family row there.
+  Do that kind of check on a throwaway database.
+  ⚠ **Pending on production** until the owner runs
+  `DATABASE_URL='<owner URL from Railway calendar-db>' npx tsx scripts/migrate.ts`; merge #3 after.
+  No app code reads the trigger, so neither order can take the site down.
+- **HOLZMAN-183 — `/admin/dates`, `/admin/branches`, `/admin/names` are bilingual.** The `dir="ltr"`
+  pins are gone; back-links use `backArrow(dir)`. Validators, draft warnings and the admin Server
+  Actions return translation keys with data (`TMessage`), rendered by `<Message>` /
+  `<InterpolatedMany>`, which `<bdi>`-isolate every value — so Hebrew keeps its own word order and a
+  Latin surname never drags punctuation out of place. Dates use the calendar's own localized
+  formatters. Hebrew "branch" is **שבט** throughout (the header's `nav.branches` changed from ענפי
+  משפחה to match `person.branch` and the tree filter). ⚠ The Hebrew is a working draft and wants a
+  native read. Still English: `setHebrewNameAction`'s errors in `actions.ts`.
 
 ### 2026-09-10 — every relative outside Israel saw every date a day early
 
