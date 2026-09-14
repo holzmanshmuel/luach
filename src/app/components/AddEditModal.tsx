@@ -5,7 +5,7 @@ import { CalendarEvent, EVENT_TYPES, EventType, HEBREW_MONTHS } from '@/lib/type
 import { Modal, fieldLabel, fieldInput, btnPrimary, btnGhost } from './Modal';
 import { useUserPrefs } from './UserPrefsContext';
 import { monthOptionLabel } from '@/lib/date-format';
-import { fullName } from '@/lib/names';
+import { fullName, idsMatchingFullName } from '@/lib/names';
 import { createEventAction, updateEventAction, deleteEventAction, getAllFamilyMembers } from '@/app/actions';
 
 // Client-side Gregorian→Hebrew conversion via a tiny API route rather than
@@ -74,7 +74,10 @@ export function AddEditModal({ mode, event, onClose }: Props) {
   const nameMatches = name.trim()
     ? members.filter(m => m.name.toLowerCase().includes(name.trim().toLowerCase())).slice(0, 6)
     : [];
-  const exactMatch = members.find(m => m.name.toLowerCase() === name.trim().toLowerCase());
+  // A typed (not clicked) name links on its own only when exactly ONE person has it —
+  // the rule createEventAction applies too. With two, "the first" would be a guess.
+  const exactIds = idsMatchingFullName(members, name);
+  const exactMatch = exactIds.length === 1 ? members.find(m => m.id === exactIds[0]) : undefined;
 
   // NOTE: legacy events (a Hebrew date + birth year but no stored English date)
   // deliberately open with the English fields blank and the Hebrew date shown in
@@ -298,7 +301,7 @@ export function AddEditModal({ mode, event, onClose }: Props) {
               {mode === 'create' && name.trim() && (
                 memberId ? (
                   <p className="text-[11px] text-accent-ink mt-1"><bdi>{name.trim()}</bdi> · {t('form.member_linked')}</p>
-                ) : exactMatch ? (
+                ) : exactIds.length > 0 ? (
                   <p className="text-[11px] text-amber-700 mt-1">{t('form.member_exists')}</p>
                 ) : (
                   <p className="text-[11px] text-ink-faint mt-1">{t('form.member_new')}</p>
