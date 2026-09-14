@@ -7,6 +7,7 @@ import {
   MAX_BRANCHES,
   MAX_BRANCH_NAME_LENGTH,
 } from '@/lib/branches';
+import { formatMessage, getT, type TMessage } from '@/lib/translations';
 
 /**
  * The branch list for ONE family — the tenant-aware read, and the only write.
@@ -113,8 +114,12 @@ export async function familyBranches(familyId?: number | null): Promise<string[]
   return resolveBranches(stored, process.env.FAMILY_BRANCHES);
 }
 
-/** Why a proposed branch list was rejected, in words an owner can act on. */
-export type BranchListProblem = string;
+/**
+ * Why a proposed branch list was rejected — a translation key plus the data it
+ * names (a branch name, a limit), so the owner reads it in their own language with
+ * the branch name `<bdi>`-isolated. Render with `formatMessage` / `<Message>`.
+ */
+export type BranchListProblem = TMessage;
 
 /**
  * Validate + clean a proposed list. PURE-ish (no I/O) and shared by the server
@@ -134,21 +139,32 @@ export function validateBranchList(
   const raw = (proposed ?? []).map(s => (s ?? '').trim().replace(/\s+/g, ' '));
 
   if (raw.length > MAX_BRANCHES) {
-    return { error: `That is more than ${MAX_BRANCHES} branches. Keep the list to the sides your family actually has.` };
+    return { error: { key: 'branches.err.too_many', params: { max: MAX_BRANCHES } } };
   }
   if (raw.some(s => !s)) {
-    return { error: 'Every branch needs a name. Fill the blank one in, or remove it.' };
+    return { error: { key: 'branches.err.blank' } };
   }
   const tooLong = raw.find(s => s.length > MAX_BRANCH_NAME_LENGTH);
   if (tooLong) {
-    return { error: `"${tooLong.slice(0, MAX_BRANCH_NAME_LENGTH)}…" is too long — keep branch names under ${MAX_BRANCH_NAME_LENGTH} characters.` };
+    return {
+      error: {
+        key: 'branches.err.too_long',
+        params: { name: tooLong.slice(0, MAX_BRANCH_NAME_LENGTH), max: MAX_BRANCH_NAME_LENGTH },
+      },
+    };
   }
   const seen = new Map<string, string>();
   for (const name of raw) {
     const key = name.toLocaleLowerCase();
     const first = seen.get(key);
     if (first !== undefined) {
-      return { error: `"${name}" is listed twice${first === name ? '' : ` (as "${first}")`}. Each branch needs its own name.` };
+      // Two whole sentences rather than an optional "(as …)" clause spliced in:
+      // a clause cannot be spliced into a Hebrew sentence in English order.
+      return {
+        error: first === name
+          ? { key: 'branches.err.duplicate', params: { name } }
+          : { key: 'branches.err.duplicate_as', params: { name, first } },
+      };
     }
     seen.set(key, name);
   }
@@ -161,7 +177,7 @@ export function validateBranchList(
   // catch — the single entry would be drawn neutral anyway, so it only looks like
   // a branch that isn't working.
   if (branches.length === 1) {
-    return { error: 'One branch on its own does nothing. Add a second — a real side of the family, plus a catch-all last — or remove it to sort nobody by side.' };
+    return { error: { key: 'branches.err.lone' } };
   }
   return { branches };
 }
@@ -187,7 +203,8 @@ export function validateBranchList(
  */
 export async function setFamilyBranches(branches: readonly string[]): Promise<string[]> {
   const checked = validateBranchList(branches);
-  if ('error' in checked) throw new Error(checked.error);
+  // A throw is for logs and callers that bypassed validation, so English is right here.
+  if ('error' in checked) throw new Error(formatMessage(getT('en'), checked.error));
   const rows = await query<{ branches: string[] }>(
     `UPDATE family_calendar.families
         SET branches = $1

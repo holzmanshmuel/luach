@@ -1,4 +1,5 @@
 import { branchStyle, catchAllBranch } from '@/lib/branches';
+import type { TMessage } from '@/lib/translations';
 
 /**
  * The pure core behind `/admin/branches`: given the family's SAVED branch list,
@@ -8,12 +9,17 @@ import { branchStyle, catchAllBranch } from '@/lib/branches';
  *
  * Split out of `BranchesPanel.tsx` so it is testable without rendering (same
  * shape as `spelling-core.ts` next door). PURE: no DB, no environment, no React.
+ *
+ * Each warning is a translation key plus its data (never a finished English
+ * sentence), so the panel renders it in the owner's language and `<bdi>`-isolates
+ * the branch names. Singular and plural are separate WHOLE sentences (`_one` /
+ * `_many`), not a word swapped inside one.
  */
 
 /** One thing the owner should know before saving. `caution` = someone will notice. */
 export interface BranchDraftWarning {
   tone: 'caution' | 'info';
-  text: string;
+  message: TMessage;
 }
 
 /**
@@ -45,9 +51,9 @@ export function computeBranchWarnings(
     const n = counts[value] ?? 0;
     out.push({
       tone: 'caution',
-      text: `${n} ${n === 1 ? 'person is' : 'people are'} filed under "${value}", which this draft no longer lists. `
-        + `Nothing breaks, but they will show in plain grey and filter under the catch-all until you `
-        + `re-file them one by one in the tree.`,
+      message: n === 1
+        ? { key: 'branches.warn.stranded_one', params: { name: value } }
+        : { key: 'branches.warn.stranded_many', params: { n, name: value } },
     });
   }
 
@@ -58,9 +64,9 @@ export function computeBranchWarnings(
   if (recoloured.length > 0) {
     out.push({
       tone: 'caution',
-      text: `This changes the colour of ${recoloured.length === 1 ? '1 branch' : `${recoloured.length} branches`}: `
-        + `${recoloured.join(', ')}. Everyone in your family has to relearn them. Adding a branch at the `
-        + `bottom of the list avoids this entirely.`,
+      message: recoloured.length === 1
+        ? { key: 'branches.warn.recolour_one', params: { names: recoloured } }
+        : { key: 'branches.warn.recolour_many', params: { n: recoloured.length, names: recoloured } },
     });
   }
 
@@ -70,8 +76,7 @@ export function computeBranchWarnings(
   if (before && after && before !== after && trimmed.includes(before)) {
     out.push({
       tone: 'info',
-      text: `"${after}" becomes the catch-all, so it loses its colour; "${before}" stops being the `
-        + `catch-all and picks one up.`,
+      message: { key: 'branches.warn.catch_all', params: { after, before } },
     });
   }
 
@@ -84,9 +89,9 @@ export function computeBranchWarnings(
   if (renamed > 0 && stranded.length === 0) {
     out.push({
       tone: 'info',
-      text: `${renamed === 1 ? '1 branch is' : `${renamed} branches are`} renamed in place — `
-        + `${renamed === 1 ? 'it keeps its' : 'they keep their'} colour, and nobody is currently filed `
-        + `under the old ${renamed === 1 ? 'name' : 'names'}.`,
+      message: renamed === 1
+        ? { key: 'branches.warn.renamed_one' }
+        : { key: 'branches.warn.renamed_many', params: { n: renamed } },
     });
   }
 

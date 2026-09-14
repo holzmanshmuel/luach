@@ -27,6 +27,32 @@ describe('auditEvent — the shape of bug this exists to catch', () => {
     expect(f.offset_days).toBe(-10);
   });
 
+  it('carries the dates as PARTS too, so a Hebrew page can localize them', () => {
+    // /admin/dates renders these with Hebrew numerals and month names; re-parsing
+    // the English display strings above to get there would couple the page to
+    // their wording.
+    const f = auditEvent(ev({ original_english_date: '1978-06-07' }));
+    expect(f.hebrew_day).toBe(12);
+    expect(f.hebrew_month).toBe('Sivan');
+    expect(f.english_falls_on_parts).toEqual({ day: 2, month: 'Sivan', hebrewYear: 5738 });
+  });
+
+  it('never lets the parts and the display string disagree', () => {
+    const rows = [
+      ev({ original_english_date: '1978-06-07' }),
+      ev({ original_english_date: '1978-06-17' }),
+      ev({ hebrew_day: 1, hebrew_month: 'Adar', original_english_date: '1997-02-08' }),
+      ev({ original_english_date: null }),
+      ev({ original_english_date: '17/09/1995' }),
+      ev({ hebrew_month: 'Marcheshvan' }),
+    ];
+    for (const f of rows.map(auditEvent)) {
+      const p = f.english_falls_on_parts;
+      expect(p === null ? null : `${p.day} ${p.month} ${p.hebrewYear}`).toBe(f.english_falls_on);
+      expect(`${f.hebrew_day} ${f.hebrew_month}`).toBe(f.stored_hebrew);
+    }
+  });
+
   it('passes the same row once the English date is corrected', () => {
     const f = auditEvent(ev({ original_english_date: '1978-06-17' }));
     expect(f.verdict).toBe('ok');

@@ -268,6 +268,105 @@ export const T: Record<Lang, Record<string, string>> = {
     'invite.copied': 'Copied',
     'invite.show_once': 'Copy this now — for security we only show the full link once.',
     'invite.back': 'Back to calendar',
+    // ── Owner admin pages: /admin/dates, /admin/branches, /admin/names ──────────
+    // Every sentence is WHOLE, with named placeholders for its data (names, dates,
+    // counts), rendered through <InterpolatedMany> so each value is <bdi>-isolated.
+    // `_one` / `_many` pairs are two whole sentences, not a pluralised word. Branch
+    // names inside quotes keep the straight quotes these messages always had.
+    'admin.back': 'Back to calendar',
+    'admin.err.owner_only': 'Only the family owner can do this.',
+    // /admin/dates — the date-consistency report
+    'dates.title': 'Date check',
+    'dates.intro': 'Every birthday and anniversary here has both a Hebrew date and an English date. They should describe the same day. This page converts one to the other and shows you any that disagree — almost always a typo in whichever list the dates were first written down in.',
+    'dates.stat_checked': 'cross-checked',
+    'dates.stat_mismatch': 'disagree',
+    'dates.stat_no_english': 'no English date',
+    'dates.empty_nothing': 'Nothing to check yet — add some birthdays and come back.',
+    'dates.empty_adar_only': 'No typos found. There is one leap-year question below.',
+    'dates.all_agree': 'Every date agrees. Nothing to fix. 🎉',
+    'dates.adar_heading': 'A leap-year Adar question',
+    'dates.adar_intro_one': 'This event falls on the same day of the month as recorded — but in a leap year, which has two Adars, and the two dates point at different ones.',
+    'dates.adar_intro_many': 'These events fall on the same day of the month as recorded — but in a leap year, which has two Adars, and the two dates point at different ones.',
+    'dates.adar_not_mistyped': 'Nothing here is mistyped.',
+    'dates.adar_rule': 'This calendar observes a plain “Adar” occasion in Adar II.',
+    'dates.adar_advice': 'If your family observes it in the first Adar instead, open the person on the family tree and set the month explicitly to “Adar I”. Otherwise leave it — it is already doing what it should.',
+    'dates.adar_row': 'Recorded as {hebrew}; the English date {english} was {falls_on}.',
+    'dates.nightfall_title': 'A one-day difference is not an error, and is not listed here.',
+    'dates.nightfall_body': 'The Hebrew day begins at nightfall, so someone born on a Tuesday evening has a Tuesday English birthday and a Wednesday Hebrew one. Only gaps of two days or more are shown.',
+    'dates.no_english_one': '1 event has no English date recorded, so there is nothing to cross-check. That is fine — the Hebrew date is all this calendar needs.',
+    'dates.no_english_many': '{n} events have no English date recorded, so there is nothing to cross-check. That is fine — the Hebrew date is all this calendar needs.',
+    'dates.unreadable': 'Could not read these dates: {hebrew} and {english}. Open this person on the family tree and re-enter the date.',
+    'dates.fixed_english': 'Fixed — the English date now matches the Hebrew one. Reload to re-check.',
+    'dates.fixed_hebrew': 'Fixed — the Hebrew date now matches the English one. Reload to re-check.',
+    'dates.gap_earlier_one': 'The English date is 1 day earlier than the Hebrew date implies.',
+    'dates.gap_earlier_many': 'The English date is {n} days earlier than the Hebrew date implies.',
+    'dates.gap_later_one': 'The English date is 1 day later than the Hebrew date implies.',
+    'dates.gap_later_many': 'The English date is {n} days later than the Hebrew date implies.',
+    'dates.far_apart': 'These two dates are far apart.',
+    'dates.which_wrong': 'One of them is wrong — which one?',
+    'dates.trust_hebrew': 'The Hebrew date is right',
+    'dates.trust_hebrew_detail': '{hebrew} fell on {expected}, so the English date should be that instead of {english}.',
+    'dates.trust_english': 'The English date is right',
+    'dates.trust_english_detail': '{english} was actually {falls_on}, so the Hebrew date should be that instead of {hebrew}.',
+    'dates.err.stale': 'That row no longer needs correcting — reload the page.',
+    'dates.err.no_hebrew': 'Could not work out the Hebrew date — edit this one by hand.',
+    // /admin/branches — the family's branch list
+    'branches.title': 'Family branches',
+    'branches.intro': 'A branch is a side of your family — usually a surname. Luach tints each person’s avatar, tree card and timeline entry by the branch they are filed under, so the sides are easy to tell apart at a glance.',
+    'branches.inherited_lead': 'These are the starter branches, not yours yet.',
+    'branches.inherited_body': 'They come from this Luach installation’s own setting. Save once and the list becomes your family’s, kept separately from every other family here.',
+    'branches.swatch_catch_all': 'No colour — this is the catch-all',
+    'branches.swatch_colour': 'Colour {n}',
+    'branches.name_aria': 'Branch {n} name',
+    'branches.name_placeholder': 'Branch name',
+    'branches.filed_title': 'People currently filed under this exact word',
+    'branches.filed_one': '1 person',
+    'branches.filed_many': '{n} people',
+    'branches.catch_all': 'catch-all',
+    'branches.keep_two': 'Keep at least two branches',
+    'branches.remove_title': 'Remove "{name}"',
+    'branches.remove_aria': 'Remove branch {name}',
+    'branches.add_label': 'Add a branch',
+    'branches.add_placeholder': 'A surname, e.g. a side that married in',
+    'branches.add': 'Add',
+    'branches.add_note': 'New branches go in just above the catch-all, which keeps every existing branch’s colour exactly where it is. This is the safe edit.',
+    'branches.saving': 'Saving…',
+    'branches.save': 'Save branches',
+    'branches.discard': 'Discard changes',
+    'branches.saved': 'Saved.',
+    'branches.rules_heading': 'Three things worth knowing',
+    'branches.rule1_lead': 'The last branch is the “no particular branch” bucket.',
+    'branches.rule1_body': 'Whichever branch sits at the bottom of the list is where people go when they don’t belong to any one side, or when the spreadsheet importer can’t tell. It is drawn in plain grey rather than a colour, and it is left out of the surname-spelling picker, because it isn’t really a surname. Call it “Other”, “Misc”, “אחר” — the name doesn’t matter, only that it is last.',
+    'branches.rule1_body_named': 'Whichever branch sits at the bottom of the list — right now that is {name} — is where people go when they don’t belong to any one side, or when the spreadsheet importer can’t tell. It is drawn in plain grey rather than a colour, and it is left out of the surname-spelling picker, because it isn’t really a surname. Call it “Other”, “Misc”, “אחר” — the name doesn’t matter, only that it is last.',
+    'branches.rule2_lead': 'Adding to the bottom is safe. Shuffling the order is not.',
+    'branches.rule2_body': 'Each branch’s colour comes from its place in this list — first place gets the first colour, second place the second, and so on. So adding a new branch changes nothing for anyone. But moving a branch up or down, or making a different branch the catch-all, hands each affected branch a colour someone else was wearing. Your family has learned those colours; they will all quietly change at once. Do it if you mean to, not by accident.',
+    'branches.rule3_lead': 'Renaming keeps the colour, but doesn’t re-file anybody.',
+    'branches.rule3_body': 'Fix a spelling here and that branch keeps the exact colour it has — the name changed, not the place. What it does not do is update the people already filed under the old name: each person stores their branch as plain text, so they stay attached to the old word and will show in plain grey until someone edits them. Same story if you remove a branch. For a handful of people that is a minute in the tree; for a whole side of the family, rename rather than replace.',
+    'branches.err.add_empty': 'Type a name for the new branch first.',
+    'branches.err.too_long_short': 'Keep branch names under {max} characters.',
+    'branches.err.exists': 'You already have a branch called "{name}".',
+    'branches.err.limit': '{max} branches is the limit.',
+    'branches.err.too_many': 'That is more than {max} branches. Keep the list to the sides your family actually has.',
+    'branches.err.blank': 'Every branch needs a name. Fill the blank one in, or remove it.',
+    'branches.err.too_long': '"{name}…" is too long — keep branch names under {max} characters.',
+    'branches.err.duplicate': '"{name}" is listed twice. Each branch needs its own name.',
+    'branches.err.duplicate_as': '"{name}" is listed twice (as "{first}"). Each branch needs its own name.',
+    'branches.err.lone': 'One branch on its own does nothing. Add a second — a real side of the family, plus a catch-all last — or remove it to sort nobody by side.',
+    'branches.err.not_migrated': 'This calendar’s database has not been updated for per-family branches yet, so the list cannot be saved. Nothing was lost — whoever runs this Luach needs to apply the pending database migration, then this page will work.',
+    'branches.warn.stranded_one': '1 person is filed under "{name}", which this draft no longer lists. Nothing breaks, but they will show in plain grey and filter under the catch-all until you re-file them one by one in the tree.',
+    'branches.warn.stranded_many': '{n} people are filed under "{name}", which this draft no longer lists. Nothing breaks, but they will show in plain grey and filter under the catch-all until you re-file them one by one in the tree.',
+    'branches.warn.recolour_one': 'This changes the colour of 1 branch: {names}. Everyone in your family has to relearn them. Adding a branch at the bottom of the list avoids this entirely.',
+    'branches.warn.recolour_many': 'This changes the colour of {n} branches: {names}. Everyone in your family has to relearn them. Adding a branch at the bottom of the list avoids this entirely.',
+    'branches.warn.catch_all': '"{after}" becomes the catch-all, so it loses its colour; "{before}" stops being the catch-all and picks one up.',
+    'branches.warn.renamed_one': '1 branch is renamed in place — it keeps its colour, and nobody is currently filed under the old name.',
+    'branches.warn.renamed_many': '{n} branches are renamed in place — they keep their colour, and nobody is currently filed under the old names.',
+    // /admin/names — confirming Hebrew spellings
+    'names.title': 'Hebrew names',
+    'names.intro': 'Confirm or correct the suggested Hebrew spelling for each person. Confirmed names show in Hebrew mode; anything left blank falls back to the English name.',
+    'names.placeholder': 'Name in Hebrew',
+    'names.confirmed': '✓ confirmed',
+    'names.suggested': 'suggested',
+    'names.confirm': 'Confirm',
     'timeline.empty': 'No dated family events yet — add birthdays or anniversaries and they’ll appear here.',
     // Person form
     'person.name': 'Name',
@@ -433,7 +532,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'nav.access': 'גישה',
     'nav.hebrew_names': 'שמות עברית',
     'nav.date_check': 'בדיקת תאריכים',
-    'nav.branches': 'ענפי משפחה',
+    'nav.branches': 'שבטי משפחה',
     'nav.subscribe': 'הרשמה',
     'nav.signout': 'התנתקות',
     // Family switcher
@@ -675,6 +774,101 @@ export const T: Record<Lang, Record<string, string>> = {
     'invite.copied': 'הועתק',
     'invite.show_once': 'העתיקו עכשיו — מטעמי אבטחה הקישור המלא מוצג פעם אחת בלבד.',
     'invite.back': 'חזרה ליומן',
+    // ── Owner admin pages (see the English note on whole sentences) ────────────
+    'admin.back': 'חזרה ליומן',
+    'admin.err.owner_only': 'רק מנהל המשפחה יכול לעשות את זה.',
+    // /admin/dates
+    'dates.title': 'בדיקת תאריכים',
+    'dates.intro': 'לכל יום הולדת ויום נישואין כאן יש גם תאריך עברי וגם תאריך לועזי, ושניהם אמורים לציין את אותו היום. הדף הזה ממיר כל אחד מהם לשני ומראה את אלה שלא מתאימים — כמעט תמיד בגלל טעות הקלדה ברשימה שבה התאריכים נרשמו לראשונה.',
+    'dates.stat_checked': 'נבדקו',
+    'dates.stat_mismatch': 'לא מתאימים',
+    'dates.stat_no_english': 'ללא תאריך לועזי',
+    'dates.empty_nothing': 'עדיין אין מה לבדוק — הוסיפו כמה ימי הולדת וחזרו לכאן.',
+    'dates.empty_adar_only': 'לא נמצאו טעויות. למטה יש שאלה אחת על שנה מעוברת.',
+    'dates.all_agree': 'כל התאריכים מתאימים. אין מה לתקן. 🎉',
+    'dates.adar_heading': 'שאלת אדר בשנה מעוברת',
+    'dates.adar_intro_one': 'האירוע הזה חל באותו יום בחודש כפי שנרשם — אבל בשנה מעוברת, שיש בה שני חודשי אדר, ושני התאריכים מצביעים על אדר אחר.',
+    'dates.adar_intro_many': 'האירועים האלה חלים באותו יום בחודש כפי שנרשם — אבל בשנה מעוברת, שיש בה שני חודשי אדר, ושני התאריכים מצביעים על אדר אחר.',
+    'dates.adar_not_mistyped': 'אין כאן שום טעות הקלדה.',
+    'dates.adar_rule': 'היומן הזה מציין אירוע של ”אדר“ סתם באדר ב׳.',
+    'dates.adar_advice': 'אם במשפחה שלכם מציינים אותו באדר הראשון, פתחו את האדם בעץ המשפחה וקבעו את החודש במפורש ל”אדר א׳“. אחרת השאירו כך — זה כבר עובד כמו שצריך.',
+    'dates.adar_row': 'נרשם כ־{hebrew}; התאריך הלועזי {english} היה {falls_on}.',
+    'dates.nightfall_title': 'הפרש של יום אחד אינו טעות, ולכן הוא לא מופיע כאן.',
+    'dates.nightfall_body': 'היום העברי מתחיל בשקיעה, כך שמי שנולד ביום שלישי בערב חוגג יום הולדת לועזי ביום שלישי ויום הולדת עברי ביום רביעי. מוצגים רק הפרשים של יומיים ומעלה.',
+    'dates.no_english_one': 'לאירוע אחד לא נרשם תאריך לועזי, כך שאין מול מה לבדוק. זה בסדר — ליומן מספיק התאריך העברי.',
+    'dates.no_english_many': 'ל־{n} אירועים לא נרשם תאריך לועזי, כך שאין מול מה לבדוק. זה בסדר — ליומן מספיק התאריך העברי.',
+    'dates.unreadable': 'לא ניתן לקרוא את התאריכים האלה: {hebrew} ו־{english}. פתחו את האדם בעץ המשפחה והזינו את התאריך מחדש.',
+    'dates.fixed_english': 'תוקן — התאריך הלועזי מתאים עכשיו לעברי. רעננו את הדף כדי לבדוק שוב.',
+    'dates.fixed_hebrew': 'תוקן — התאריך העברי מתאים עכשיו ללועזי. רעננו את הדף כדי לבדוק שוב.',
+    'dates.gap_earlier_one': 'התאריך הלועזי מוקדם ביום אחד ממה שעולה מהתאריך העברי.',
+    'dates.gap_earlier_many': 'התאריך הלועזי מוקדם ב־{n} ימים ממה שעולה מהתאריך העברי.',
+    'dates.gap_later_one': 'התאריך הלועזי מאוחר ביום אחד ממה שעולה מהתאריך העברי.',
+    'dates.gap_later_many': 'התאריך הלועזי מאוחר ב־{n} ימים ממה שעולה מהתאריך העברי.',
+    'dates.far_apart': 'שני התאריכים האלה רחוקים מאוד זה מזה.',
+    'dates.which_wrong': 'אחד מהם שגוי — איזה?',
+    'dates.trust_hebrew': 'התאריך העברי נכון',
+    'dates.trust_hebrew_detail': '{hebrew} חל ב־{expected}, ולכן התאריך הלועזי צריך להיות זה במקום {english}.',
+    'dates.trust_english': 'התאריך הלועזי נכון',
+    'dates.trust_english_detail': '{english} היה בעצם {falls_on}, ולכן התאריך העברי צריך להיות זה במקום {hebrew}.',
+    'dates.err.stale': 'השורה הזו כבר לא צריכה תיקון — רעננו את הדף.',
+    'dates.err.no_hebrew': 'לא ניתן לחשב את התאריך העברי — ערכו אותו ידנית.',
+    // /admin/branches
+    'branches.title': 'שבטי המשפחה',
+    'branches.intro': 'שבט הוא צד של המשפחה — בדרך כלל שם משפחה. לוּחַ צובע את התמונה, את הכרטיס בעץ ואת השורה בציר הזמן של כל אדם לפי השבט שהוא משויך אליו, כך שקל להבחין בין הצדדים במבט אחד.',
+    'branches.inherited_lead': 'אלה שבטי ההתחלה, ועדיין לא שלכם.',
+    'branches.inherited_body': 'הם מגיעים מההגדרה של התקנת לוּחַ הזו. שמרו פעם אחת והרשימה תהיה של המשפחה שלכם, נפרדת מכל משפחה אחרת כאן.',
+    'branches.swatch_catch_all': 'ללא צבע — זה השבט הכללי',
+    'branches.swatch_colour': 'צבע {n}',
+    'branches.name_aria': 'שם שבט {n}',
+    'branches.name_placeholder': 'שם השבט',
+    'branches.filed_title': 'אנשים שמשויכים כרגע למילה המדויקת הזו',
+    'branches.filed_one': 'אדם אחד',
+    'branches.filed_many': '{n} אנשים',
+    'branches.catch_all': 'כללי',
+    'branches.keep_two': 'צריך להשאיר לפחות שני שבטים',
+    'branches.remove_title': 'הסרת ”{name}“',
+    'branches.remove_aria': 'הסרת השבט {name}',
+    'branches.add_label': 'הוספת שבט',
+    'branches.add_placeholder': 'שם משפחה, למשל צד שהצטרף בנישואין',
+    'branches.add': 'הוספה',
+    'branches.add_note': 'שבטים חדשים נכנסים ממש מעל השבט הכללי, כך שהצבע של כל שבט קיים נשאר בדיוק כמו שהוא. זה השינוי הבטוח.',
+    'branches.saving': 'שומר…',
+    'branches.save': 'שמירת השבטים',
+    'branches.discard': 'ביטול השינויים',
+    'branches.saved': 'נשמר.',
+    'branches.rules_heading': 'שלושה דברים שכדאי לדעת',
+    'branches.rule1_lead': 'השבט האחרון הוא הסל של ”בלי שבט מסוים“.',
+    'branches.rule1_body': 'השבט שבתחתית הרשימה הוא המקום של מי שלא שייך לצד מסוים, או כשמייבא הגיליון לא יכול לדעת. הוא מוצג באפור פשוט ולא בצבע, ולא נכלל בבחירת הכתיב של שמות המשפחה, כי הוא לא באמת שם משפחה. קראו לו ”אחר“, ”שונות“ או ”כללי“ — השם לא משנה, רק שיהיה אחרון.',
+    'branches.rule1_body_named': 'השבט שבתחתית הרשימה — כרגע זה {name} — הוא המקום של מי שלא שייך לצד מסוים, או כשמייבא הגיליון לא יכול לדעת. הוא מוצג באפור פשוט ולא בצבע, ולא נכלל בבחירת הכתיב של שמות המשפחה, כי הוא לא באמת שם משפחה. קראו לו ”אחר“, ”שונות“ או ”כללי“ — השם לא משנה, רק שיהיה אחרון.',
+    'branches.rule2_lead': 'הוספה בתחתית בטוחה. שינוי הסדר — לא.',
+    'branches.rule2_body': 'הצבע של כל שבט נקבע לפי המקום שלו ברשימה — המקום הראשון מקבל את הצבע הראשון, השני את השני, וכן הלאה. לכן הוספת שבט חדש לא משנה כלום לאף אחד. אבל הזזת שבט למעלה או למטה, או הפיכת שבט אחר לכללי, נותנת לכל שבט מושפע צבע שהיה של מישהו אחר. המשפחה כבר התרגלה לצבעים האלה, והם ישתנו כולם בבת אחת. עשו את זה רק בכוונה, לא בטעות.',
+    'branches.rule3_lead': 'שינוי שם שומר על הצבע, אבל לא משייך אף אחד מחדש.',
+    'branches.rule3_body': 'תקנו כתיב כאן והשבט ישמור בדיוק על הצבע שלו — השם השתנה, לא המקום. מה שזה לא עושה הוא לעדכן את האנשים שכבר משויכים לשם הישן: כל אדם שומר את השבט שלו כטקסט פשוט, ולכן הוא נשאר צמוד למילה הישנה ויוצג באפור עד שמישהו יערוך אותו. אותו דבר קורה כשמסירים שבט. לקומץ אנשים זו דקה בעץ; לצד שלם של המשפחה — עדיף לשנות שם ולא להחליף.',
+    'branches.err.add_empty': 'הקלידו קודם שם לשבט החדש.',
+    'branches.err.too_long_short': 'שמות שבטים צריכים להיות קצרים מ־{max} תווים.',
+    'branches.err.exists': 'כבר יש שבט בשם ”{name}“.',
+    'branches.err.limit': 'המגבלה היא {max} שבטים.',
+    'branches.err.too_many': 'זה יותר מ־{max} שבטים. השאירו ברשימה רק את הצדדים שיש באמת במשפחה.',
+    'branches.err.blank': 'לכל שבט צריך שם. מלאו את השורה הריקה, או הסירו אותה.',
+    'branches.err.too_long': '”{name}…“ ארוך מדי — שמות שבטים צריכים להיות קצרים מ־{max} תווים.',
+    'branches.err.duplicate': '”{name}“ מופיע פעמיים. לכל שבט צריך שם משלו.',
+    'branches.err.duplicate_as': '”{name}“ מופיע פעמיים (גם בתור ”{first}“). לכל שבט צריך שם משלו.',
+    'branches.err.lone': 'שבט אחד לבד לא עושה כלום. הוסיפו שבט שני — צד אמיתי של המשפחה, ושבט כללי בסוף — או הסירו אותו כדי לא למיין אף אחד לפי צד.',
+    'branches.err.not_migrated': 'מסד הנתונים של היומן הזה עדיין לא עודכן לשבטים נפרדים לכל משפחה, ולכן אי אפשר לשמור את הרשימה. שום דבר לא אבד — מי שמפעיל את לוּחַ צריך להריץ את עדכון מסד הנתונים שממתין, ואז הדף הזה יעבוד.',
+    'branches.warn.stranded_one': 'אדם אחד משויך ל־”{name}“, שכבר לא מופיע בטיוטה הזו. שום דבר לא נשבר, אבל הוא יוצג באפור ויסונן תחת השבט הכללי עד שתשייכו אותו מחדש בעץ.',
+    'branches.warn.stranded_many': '{n} אנשים משויכים ל־”{name}“, שכבר לא מופיע בטיוטה הזו. שום דבר לא נשבר, אבל הם יוצגו באפור ויסוננו תחת השבט הכללי עד שתשייכו אותם מחדש, אחד אחד, בעץ.',
+    'branches.warn.recolour_one': 'השינוי הזה משנה את הצבע של שבט אחד: {names}. כל המשפחה תצטרך להתרגל אליו מחדש. הוספת שבט בתחתית הרשימה חוסכת את זה לגמרי.',
+    'branches.warn.recolour_many': 'השינוי הזה משנה את הצבע של {n} שבטים: {names}. כל המשפחה תצטרך להתרגל אליהם מחדש. הוספת שבט בתחתית הרשימה חוסכת את זה לגמרי.',
+    'branches.warn.catch_all': '”{after}“ הופך לשבט הכללי ומאבד את הצבע שלו; ”{before}“ מפסיק להיות הכללי ומקבל צבע.',
+    'branches.warn.renamed_one': 'שבט אחד שונה במקומו — הוא שומר על הצבע שלו, ואף אחד לא משויך כרגע לשם הישן.',
+    'branches.warn.renamed_many': '{n} שבטים שונו במקומם — הם שומרים על הצבע שלהם, ואף אחד לא משויך כרגע לשמות הישנים.',
+    // /admin/names
+    'names.title': 'שמות בעברית',
+    'names.intro': 'אשרו או תקנו את הכתיב העברי המוצע לכל אדם. שמות שאושרו מוצגים במצב עברית; שם שנשאר ריק יוצג בשם האנגלי.',
+    'names.placeholder': 'שם בעברית',
+    'names.confirmed': '✓ אושר',
+    'names.suggested': 'מוצע',
+    'names.confirm': 'אישור',
     'timeline.empty': 'עדיין אין אירועים מתוארכים — הוסיפו ימי הולדת או ימי נישואין והם יופיעו כאן.',
     // Person form
     'person.name': 'שם',
@@ -852,4 +1046,79 @@ export function splitTemplate(
   const at = template.indexOf(marker);
   if (at === -1) return [template, ''];
   return [template.slice(0, at), template.slice(at + marker.length)];
+}
+
+/**
+ * A value substituted into a translated template. A LIST (e.g. several branch
+ * names) renders as its items, each direction-isolated on its own — so a Hebrew
+ * reader sees the first item on the right, not one Latin run in English order.
+ */
+export type TParam = string | number | readonly string[];
+export type TParams = Readonly<Record<string, TParam>>;
+
+/**
+ * A translatable message that has not been rendered yet: a key, plus the DATA that
+ * fills its named placeholders.
+ *
+ * Server Actions and pure validators return this instead of a finished English
+ * sentence. Two reasons, both about the reader rather than the code: the client can
+ * translate it into the viewer's language, and it can wrap each data value (a branch
+ * name, a date) in `<bdi>` — which a pre-joined string can no longer do, because by
+ * then nobody knows where the data starts and ends.
+ */
+export interface TMessage {
+  key: string;
+  params?: TParams;
+}
+
+export type TemplatePart = { text: string } | { placeholder: string };
+
+const PLACEHOLDER = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+
+/**
+ * Split a whole-sentence template into its literal text and EVERY `{placeholder}`,
+ * in order. The many-values sibling of {@link splitTemplate}: some sentences carry
+ * two or three dates, and each still has to be isolated separately while the
+ * sentence around them stays one translatable string.
+ */
+export function templateParts(template: string): TemplatePart[] {
+  const parts: TemplatePart[] = [];
+  let last = 0;
+  for (const m of template.matchAll(PLACEHOLDER)) {
+    const at = m.index ?? 0;
+    if (at > last) parts.push({ text: template.slice(last, at) });
+    parts.push({ placeholder: m[1] });
+    last = at + m[0].length;
+  }
+  if (last < template.length) parts.push({ text: template.slice(last) });
+  return parts;
+}
+
+/** The distinct placeholder names a template uses, sorted — for parity checks. */
+export function templatePlaceholders(template: string): string[] {
+  const names = templateParts(template).flatMap(p => ('placeholder' in p ? [p.placeholder] : []));
+  return [...new Set(names)].sort();
+}
+
+function paramText(value: TParam | undefined): string {
+  if (value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return value.join(', ');
+}
+
+/**
+ * Fill a template into a PLAIN string. For the places `<bdi>` cannot reach — an
+ * attribute (`title`, `aria-label`) or a log/Error message. Anything a reader sees
+ * as page text should go through `<InterpolatedMany>` instead. A placeholder with no
+ * value renders as nothing, never as a literal `{name}` on screen.
+ */
+export function fillTemplate(template: string, params: TParams = {}): string {
+  return templateParts(template)
+    .map(p => ('text' in p ? p.text : paramText(params[p.placeholder])))
+    .join('');
+}
+
+/** Render a {@link TMessage} as a plain string in the language `t` speaks. */
+export function formatMessage(t: (key: string) => string, message: TMessage): string {
+  return fillTemplate(t(message.key), message.params);
 }
