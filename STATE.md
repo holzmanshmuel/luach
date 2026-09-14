@@ -54,8 +54,9 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 - Scheduled work is external. On the reference deployment ONE n8n job runs daily at 08:00
   Asia/Jerusalem and calls `/api/digest/daily` per family (recipients = members with a phone). The
   legacy `/api/digest/week` and `/api/reminders/yahrzeit` schedules are deactivated, and
-  `DIGEST_RECIPIENTS` is being removed from the hosted service (HOLZMAN-180); self-hosters on the
-  legacy routes can still set it.
+  `DIGEST_RECIPIENTS` was deleted from the hosted service on 2026-09-14 (HOLZMAN-180) so a re-enabled
+  legacy workflow cannot leak one family's dates to another; self-hosters on the legacy routes can
+  still set it.
 
 ## Log
 
