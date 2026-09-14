@@ -9,7 +9,10 @@ import {
   MAX_BRANCH_NAME_LENGTH,
 } from '@/lib/branches';
 import { computeBranchWarnings } from '@/lib/branch-draft';
+import { fillTemplate, type TMessage } from '@/lib/translations';
 import { fieldInput, fieldLabel, btnPrimary, btnGhost } from '@/lib/ui';
+import { useUserPrefs } from '@/app/components/UserPrefsContext';
+import { InterpolatedMany, Message } from '@/app/components/Interpolated';
 
 /**
  * Owner-facing editor for THIS family's branch list.
@@ -20,8 +23,12 @@ import { fieldInput, fieldLabel, btnPrimary, btnGhost } from '@/lib/ui';
  * update live so a reorder's cost is visible BEFORE it is committed rather than
  * explained afterwards.
  *
- * Hardcoded English, like the sibling /admin/access and /admin/names panels.
- * The "what would saving cost" reasoning is pure and lives in lib/branch-draft.ts.
+ * Bilingual: copy comes from `useUserPrefs().t`. Branch names are the family's own
+ * DATA — never translated, `<bdi>`-isolated in sentences, and typed into
+ * `dir="auto"` inputs so a Latin surname stays left-aligned on the Hebrew page.
+ * Attributes (`title`, `aria-label`) cannot hold a `<bdi>`, so they use the plain
+ * `fillTemplate`. The "what would saving cost" reasoning is pure and lives in
+ * lib/branch-draft.ts.
  */
 
 export function BranchesPanel({
@@ -36,9 +43,10 @@ export function BranchesPanel({
   /** True when the family has no list of its own yet and is showing the deployment default. */
   inherited: boolean;
 }) {
+  const { t } = useUserPrefs();
   const [draft, setDraft] = useState<string[]>(branches);
   const [added, setAdded] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<TMessage | null>(null);
   const [saved, setSaved] = useState(false);
   const [isPending, start] = useTransition();
 
@@ -57,15 +65,15 @@ export function BranchesPanel({
   /** Append. The safe edit: every existing position — and so every colour — stays put. */
   function add() {
     const name = added.trim().replace(/\s+/g, ' ');
-    if (!name) return setError('Type a name for the new branch first.');
+    if (!name) return setError({ key: 'branches.err.add_empty' });
     if (name.length > MAX_BRANCH_NAME_LENGTH) {
-      return setError(`Keep branch names under ${MAX_BRANCH_NAME_LENGTH} characters.`);
+      return setError({ key: 'branches.err.too_long_short', params: { max: MAX_BRANCH_NAME_LENGTH } });
     }
     if (draft.some(b => b.toLocaleLowerCase() === name.toLocaleLowerCase())) {
-      return setError(`You already have a branch called "${name}".`);
+      return setError({ key: 'branches.err.exists', params: { name } });
     }
     if (draft.length >= MAX_BRANCHES) {
-      return setError(`${MAX_BRANCHES} branches is the limit.`);
+      return setError({ key: 'branches.err.limit', params: { max: MAX_BRANCHES } });
     }
     // Inserted BEFORE the catch-all, so the catch-all stays last (its position is
     // what makes it the catch-all) and every other position is untouched.
@@ -110,9 +118,8 @@ export function BranchesPanel({
     <div>
       {inherited && (
         <p className="text-sm text-ink-2 bg-accent-soft border border-warm-border rounded-lg px-4 py-3 mb-6">
-          <strong className="text-ink">These are the starter branches</strong>, not yours yet — they
-          come from this Luach installation&apos;s own setting. Save once and the list becomes your
-          family&apos;s, kept separately from every other family here.
+          <strong className="text-ink">{t('branches.inherited_lead')}</strong>{' '}
+          {t('branches.inherited_body')}
         </p>
       )}
 
@@ -126,22 +133,27 @@ export function BranchesPanel({
             <div key={i} className="flex items-center gap-3 py-3">
               <span
                 aria-hidden
-                title={isCatchAll ? 'No colour — this is the catch-all' : `Colour ${i + 1}`}
+                title={isCatchAll ? t('branches.swatch_catch_all') : fillTemplate(t('branches.swatch_colour'), { n: i + 1 })}
                 className={`w-6 h-6 shrink-0 rounded-full ${style.bg} border border-warm-border`}
               />
               <input
+                dir="auto"
                 value={name}
                 onChange={e => rename(i, e.target.value)}
                 maxLength={MAX_BRANCH_NAME_LENGTH}
-                aria-label={`Branch ${i + 1} name`}
+                aria-label={fillTemplate(t('branches.name_aria'), { n: i + 1 })}
                 className={`${fieldInput} flex-1`}
-                placeholder="Branch name"
+                placeholder={t('branches.name_placeholder')}
               />
               <span
                 className="w-20 shrink-0 text-[10px] text-ink-faint text-end"
-                title="People currently filed under this exact word"
+                title={t('branches.filed_title')}
               >
-                {filed > 0 ? `${filed} ${filed === 1 ? 'person' : 'people'}` : null}
+                {filed > 0
+                  ? filed === 1
+                    ? t('branches.filed_one')
+                    : fillTemplate(t('branches.filed_many'), { n: filed })
+                  : null}
               </span>
               <label className="shrink-0 flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer">
                 <input
@@ -151,14 +163,14 @@ export function BranchesPanel({
                   onChange={() => makeCatchAll(i)}
                   className="accent-accent"
                 />
-                catch-all
+                {t('branches.catch_all')}
               </label>
               <button
                 type="button"
                 onClick={() => remove(i)}
                 disabled={draft.length <= 2}
-                title={draft.length <= 2 ? 'Keep at least two branches' : `Remove "${name}"`}
-                aria-label={`Remove branch ${name}`}
+                title={draft.length <= 2 ? t('branches.keep_two') : fillTemplate(t('branches.remove_title'), { name })}
+                aria-label={fillTemplate(t('branches.remove_aria'), { name })}
                 className="shrink-0 text-xs rounded-full border border-warm-border px-2.5 py-1 text-ink-muted hover:bg-parchment-dark disabled:opacity-30 transition-colors"
               >
                 ✕
@@ -171,23 +183,21 @@ export function BranchesPanel({
       {/* ── Add ─────────────────────────────────────────────────────────────── */}
       <div className="flex items-end gap-3 mt-5">
         <div className="flex-1">
-          <label htmlFor="new-branch" className={fieldLabel}>Add a branch</label>
+          <label htmlFor="new-branch" className={fieldLabel}>{t('branches.add_label')}</label>
           <input
             id="new-branch"
+            dir="auto"
             value={added}
             onChange={e => { setAdded(e.target.value); setError(null); }}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
             maxLength={MAX_BRANCH_NAME_LENGTH}
             className={fieldInput}
-            placeholder="A surname, e.g. a side that married in"
+            placeholder={t('branches.add_placeholder')}
           />
         </div>
-        <button type="button" onClick={add} className={btnGhost}>Add</button>
+        <button type="button" onClick={add} className={btnGhost}>{t('branches.add')}</button>
       </div>
-      <p className="text-xs text-ink-faint mt-2">
-        New branches go in just above the catch-all, which keeps every existing branch&apos;s colour
-        exactly where it is. This is the safe edit.
-      </p>
+      <p className="text-xs text-ink-faint mt-2">{t('branches.add_note')}</p>
 
       {/* ── Warnings about THIS draft ────────────────────────────────────────── */}
       {warnings.length > 0 && (
@@ -201,58 +211,55 @@ export function BranchesPanel({
                   : 'bg-parchment-dark border-warm-border text-ink-2'
               }`}
             >
-              {w.text}
+              <Message t={t} message={w.message} />
             </li>
           ))}
         </ul>
       )}
 
-      {error && <p className="mt-5 text-sm text-[#8C2F26]">{error}</p>}
+      {error && (
+        <p className="mt-5 text-sm text-[#8C2F26]">
+          <Message t={t} message={error} />
+        </p>
+      )}
 
       <div className="flex items-center gap-3 mt-6">
         <button type="button" onClick={save} disabled={isPending || !dirty} className={btnPrimary}>
-          {isPending ? 'Saving…' : 'Save branches'}
+          {isPending ? t('branches.saving') : t('branches.save')}
         </button>
         {dirty && (
           <button type="button" onClick={() => { setDraft(branches); setError(null); }} className={btnGhost}>
-            Discard changes
+            {t('branches.discard')}
           </button>
         )}
-        {saved && !dirty && <span className="text-sm text-ink-muted">Saved.</span>}
+        {saved && !dirty && <span className="text-sm text-ink-muted">{t('branches.saved')}</span>}
       </div>
 
       {/* ── The rules, in plain language ─────────────────────────────────────── */}
       <div className="mt-10 pt-6 border-t border-warm-border space-y-4 text-sm text-ink-2">
-        <h2 className="font-display text-lg text-ink">Three things worth knowing</h2>
+        <h2 className="font-display text-lg text-ink">{t('branches.rules_heading')}</h2>
 
         <p>
-          <strong className="text-ink">The last branch is the &ldquo;no particular branch&rdquo; bucket.</strong>{' '}
-          Whichever branch sits at the bottom of the list
-          {catchAll ? <> — right now that is <em>{catchAll}</em> —</> : null}{' '}
-          is where people go when they don&apos;t belong to any one side, or when the spreadsheet
-          importer can&apos;t tell. It is drawn in plain grey rather than a colour, and it is left
-          out of the surname-spelling picker, because it isn&apos;t really a surname. Call it
-          &ldquo;Other&rdquo;, &ldquo;Misc&rdquo;, &ldquo;אחר&rdquo; — the name doesn&apos;t matter,
-          only that it is last.
+          <strong className="text-ink">{t('branches.rule1_lead')}</strong>{' '}
+          {catchAll ? (
+            <InterpolatedMany
+              template={t('branches.rule1_body_named')}
+              params={{ name: catchAll }}
+              valueClassName="italic"
+            />
+          ) : (
+            t('branches.rule1_body')
+          )}
         </p>
 
         <p>
-          <strong className="text-ink">Adding to the bottom is safe. Shuffling the order is not.</strong>{' '}
-          Each branch&apos;s colour comes from its <em>place</em> in this list — first place gets the
-          first colour, second place the second, and so on. So adding a new branch changes nothing
-          for anyone. But moving a branch up or down, or making a different branch the catch-all,
-          hands each affected branch a colour someone else was wearing. Your family has learned
-          those colours; they will all quietly change at once. Do it if you mean to, not by accident.
+          <strong className="text-ink">{t('branches.rule2_lead')}</strong>{' '}
+          {t('branches.rule2_body')}
         </p>
 
         <p>
-          <strong className="text-ink">Renaming keeps the colour, but doesn&apos;t re-file anybody.</strong>{' '}
-          Fix a spelling here and that branch keeps the exact colour it has — the name changed,
-          not the place. What it does <em>not</em> do is update the people already filed under the
-          old name: each person stores their branch as plain text, so they stay attached to the old
-          word and will show in plain grey until someone edits them. Same story if you remove a
-          branch. For a handful of people that is a minute in the tree; for a whole side of the
-          family, rename rather than replace.
+          <strong className="text-ink">{t('branches.rule3_lead')}</strong>{' '}
+          {t('branches.rule3_body')}
         </p>
       </div>
     </div>

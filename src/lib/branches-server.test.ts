@@ -16,6 +16,7 @@ import {
   MAX_BRANCHES,
   MAX_BRANCH_NAME_LENGTH,
 } from '@/lib/branches';
+import { T, formatMessage, getT, type TMessage } from '@/lib/translations';
 
 /**
  * Requires DATABASE_URL pointing at staging Postgres with migration v14 applied
@@ -308,14 +309,43 @@ describe('cross-family isolation of families.branches', () => {
 describe('validateBranchList', () => {
   const ok = (list: string[]) => {
     const r = validateBranchList(list);
-    if ('error' in r) throw new Error(`expected valid, got: ${r.error}`);
+    if ('error' in r) throw new Error(`expected valid, got: ${r.error.key}`);
     return r.branches;
   };
-  const err = (list: string[]): string => {
+  /** The problem as a translation key plus data. */
+  const problem = (list: string[]): TMessage => {
     const r = validateBranchList(list);
     if (!('error' in r)) throw new Error('expected an error');
     return r.error;
   };
+  /** The problem rendered as the English sentence an owner reads. */
+  const err = (list: string[]): string => formatMessage(getT('en'), problem(list));
+
+  it('reports each problem as a translation key, with the branch name as separate data', () => {
+    // A key is what lets the Hebrew page say it in Hebrew; the name staying a
+    // separate param is what lets the page <bdi>-isolate it inside that sentence.
+    expect(problem(['A', '   ', 'Rest'])).toEqual({ key: 'branches.err.blank' });
+    expect(problem(['Katz', 'Katz', 'Rest'])).toEqual({ key: 'branches.err.duplicate', params: { name: 'Katz' } });
+    expect(problem(['Katz', 'katz', 'Rest'])).toEqual({
+      key: 'branches.err.duplicate_as',
+      params: { name: 'katz', first: 'Katz' },
+    });
+    expect(problem(['Only'])).toEqual({ key: 'branches.err.lone' });
+    expect(problem(['A'.repeat(MAX_BRANCH_NAME_LENGTH + 1), 'Rest'])).toEqual({
+      key: 'branches.err.too_long',
+      params: { name: 'A'.repeat(MAX_BRANCH_NAME_LENGTH), max: MAX_BRANCH_NAME_LENGTH },
+    });
+    for (const list of [['A', '', 'Rest'], ['Katz', 'katz', 'Rest'], ['Only']]) {
+      const { key } = problem(list);
+      expect(T.en[key], `${key} missing in English`).toBeDefined();
+      expect(T.he[key], `${key} missing in Hebrew`).toBeDefined();
+    }
+  });
+
+  it('keeps the "(as …)" detail only when the duplicate differs in case or spacing', () => {
+    expect(err(['Katz', 'katz', 'Rest'])).toBe('"katz" is listed twice (as "Katz"). Each branch needs its own name.');
+    expect(err(['Katz', 'Katz', 'Rest'])).toBe('"Katz" is listed twice. Each branch needs its own name.');
+  });
 
   it('accepts a normal list and trims it', () => {
     expect(ok([' Levy ', 'Katz', 'Other'])).toEqual(['Levy', 'Katz', 'Other']);
@@ -461,6 +491,7 @@ describe('a new family never inherits the operator’s surnames', () => {
   it('accepts clearing the list, and rejects a lone branch', () => {
     expect(validateBranchList([])).toEqual({ branches: [] });
     const lone = validateBranchList(['Solo']);
-    expect('error' in lone && lone.error).toMatch(/does nothing/i);
+    expect('error' in lone && formatMessage(getT('en'), lone.error)).toMatch(/does nothing/i);
+    expect('error' in lone && lone.error.key).toBe('branches.err.lone');
   });
 });

@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { requireAdmin, getSession } from '@/lib/auth';
 import { familyBranches, storedFamilyBranches } from '@/lib/branches-server';
+import { getT, type Lang } from '@/lib/translations';
+import { backArrow, dirForLang } from '@/lib/direction';
 import { BranchesPanel } from './BranchesPanel';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +40,11 @@ export default async function BranchesAdminPage() {
   const session = await getSession();
   const familyId = session.familyId!; // requireAdmin threw if this were unset
 
+  const cookieStore = await cookies();
+  const lang: Lang = cookieStore.get('lang')?.value === 'he' ? 'he' : 'en';
+  const t = getT(lang);
+  const dir = dirForLang(lang);
+
   const [branches, stored, counts] = await Promise.all([
     familyBranches(),
     storedFamilyBranches(familyId),
@@ -48,21 +56,19 @@ export default async function BranchesAdminPage() {
   // theirs, and from then on the deployment's value no longer reaches them.
   const inherited = stored === null || stored.length === 0;
 
-  // dir="ltr" below is deliberate. This page is hardcoded English (like its
-  // sibling admin pages), but the root layout sets dir="rtl" for a Hebrew
-  // viewer — which scrambles the English text, reorders rows and turns
-  // "← Calendar" into "Calendar ←". Pinning the direction to the language the
-  // page is actually written in keeps it readable until it is translated.
   return (
-    <div dir="ltr" className="min-h-screen bg-parchment">
+    <div dir={dir} className="min-h-screen bg-parchment">
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <Link href="/" className="text-sm text-ink-muted hover:text-ink transition-colors">← Calendar</Link>
-        <h1 className="font-display text-3xl text-ink mt-3 mb-1">Family branches</h1>
-        <p className="text-ink-muted text-sm mb-6">
-          A branch is a side of your family — usually a surname. Luach tints each person&apos;s
-          avatar, tree card and timeline entry by the branch they are filed under, so the sides
-          are easy to tell apart at a glance.
-        </p>
+        {/* The arrow comes from `dir` (lib/direction.ts), never from the label. */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors"
+        >
+          <span aria-hidden>{backArrow(dir)}</span>
+          {t('admin.back')}
+        </Link>
+        <h1 className="font-display text-3xl text-ink mt-3 mb-1">{t('branches.title')}</h1>
+        <p className="text-ink-muted text-sm mb-6">{t('branches.intro')}</p>
         <BranchesPanel branches={branches} counts={counts} inherited={inherited} />
       </div>
     </div>

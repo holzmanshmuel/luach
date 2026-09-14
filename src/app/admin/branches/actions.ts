@@ -3,6 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { withAdminOrError } from '@/lib/auth';
 import { isUndefinedColumn, setFamilyBranches, validateBranchList } from '@/lib/branches-server';
+import { keyedDenial } from '@/lib/action-errors';
+import type { TMessage } from '@/lib/translations';
+
+type SaveBranchesResult = { error?: TMessage; branches?: string[] };
 
 /**
  * Replace the active family's branch list with `next`, in order.
@@ -21,11 +25,12 @@ import { isUndefinedColumn, setFamilyBranches, validateBranchList } from '@/lib/
  * its position, so "add", "rename" and "make this the catch-all" are all the same
  * operation — write the new order — and there is no way for two edits to leave a
  * gap or a shifted position behind.
+ *
+ * Errors are translation keys with their data (`TMessage`), never English text —
+ * the page is bilingual and the client renders them in the owner's language.
  */
-export async function saveBranchesAction(
-  next: string[]
-): Promise<{ error?: string; branches?: string[] }> {
-  return withAdminOrError(async () => {
+export async function saveBranchesAction(next: string[]): Promise<SaveBranchesResult> {
+  return keyedDenial(await withAdminOrError(async (): Promise<SaveBranchesResult> => {
     // Validate before writing so the owner gets the reason in words. Not for
     // safety — setFamilyBranches() re-checks and the DB has a shape constraint.
     const checked = validateBranchList(next);
@@ -41,12 +46,7 @@ export async function saveBranchesAction(
       // put the list — so say that in words instead of throwing a 500 at someone
       // who has just spent a minute typing their family's surnames.
       if (isUndefinedColumn(err)) {
-        return {
-          error:
-            'This calendar\'s database has not been updated for per-family branches yet, ' +
-            'so the list cannot be saved. Nothing was lost — whoever runs this Luach needs ' +
-            'to apply the pending database migration, then this page will work.',
-        };
+        return { error: { key: 'branches.err.not_migrated' } };
       }
       throw err;
     }
@@ -55,5 +55,5 @@ export async function saveBranchesAction(
     // gates which branches can carry alternate spellings.
     revalidatePath('/', 'layout');
     return { branches };
-  });
+  }));
 }
