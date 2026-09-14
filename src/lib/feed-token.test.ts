@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { systemQuery } from '@/lib/db';
+import { query, systemQuery } from '@/lib/db';
+import { runWithTenant } from '@/lib/tenant';
+import { deleteFamilies } from '@/test-stubs/families';
 import { familyIdForFeedToken, feedTokenForFamily } from '@/lib/feed-token';
 
 // Requires DATABASE_URL pointing at staging Postgres with migration v13 applied
@@ -7,8 +9,9 @@ import { familyIdForFeedToken, feedTokenForFamily } from '@/lib/feed-token';
 // app_user, the role the app really connects as, so the table-level grants that
 // must cover the new column are the ones exercised here.
 //
-// `families` is one of the non-RLS tenancy tables, so every read/write below is a
-// systemQuery (same discipline as users.ts / tokens.test.ts).
+// `families` is one of the non-RLS tenancy tables, so reads and inserts below are a
+// systemQuery (same discipline as users.ts / tokens.test.ts). UPDATE and DELETE are
+// not: since migrate-v17 those run from inside the family's own tenant context.
 
 /** Make a throwaway family and return its id. NOTE: feed_token is never supplied
  *  — the column DEFAULT is what must mint it (no app-code change on create). */
@@ -21,7 +24,7 @@ async function makeFamily(name: string): Promise<number> {
 }
 
 async function dropFamily(id: number): Promise<void> {
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [id]);
+  await deleteFamilies(id);
 }
 
 async function readToken(id: number): Promise<string> {
@@ -62,17 +65,20 @@ describe('families.feed_token column', () => {
     expect(Number(rows[0].n)).toBe(0);
   });
 
+  // Both constraint tests write from inside the updated family's OWN tenant context and
+  // assert the constraint's SQLSTATE. Since migrate-v17 a bare systemQuery UPDATE is
+  // refused by the families write guard (42501) before any constraint is consulted —
+  // so the old `rejects.toThrow()` would still have passed while testing nothing.
   it('refuses a duplicate token (UNIQUE constraint)', async () => {
     const a = await makeFamily('Feed Token Unique A');
     const b = await makeFamily('Feed Token Unique B');
     try {
       const tokenA = await readToken(a);
       await expect(
-        systemQuery('UPDATE family_calendar.families SET feed_token = $1 WHERE id = $2', [
-          tokenA,
-          b,
-        ])
-      ).rejects.toThrow();
+        runWithTenant(b, () =>
+          query('UPDATE family_calendar.families SET feed_token = $1 WHERE id = $2', [tokenA, b])
+        )
+      ).rejects.toMatchObject({ code: '23505' }); // unique_violation
     } finally {
       await dropFamily(a);
       await dropFamily(b);
@@ -83,8 +89,10 @@ describe('families.feed_token column', () => {
     const a = await makeFamily('Feed Token NotNull A');
     try {
       await expect(
-        systemQuery('UPDATE family_calendar.families SET feed_token = NULL WHERE id = $1', [a])
-      ).rejects.toThrow();
+        runWithTenant(a, () =>
+          query('UPDATE family_calendar.families SET feed_token = NULL WHERE id = $1', [a])
+        )
+      ).rejects.toMatchObject({ code: '23502' }); // not_null_violation
     } finally {
       await dropFamily(a);
     }

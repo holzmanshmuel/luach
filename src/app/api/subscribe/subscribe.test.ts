@@ -12,6 +12,7 @@ vi.mock('@/lib/auth', () => ({ getSession: vi.fn() }));
 
 import { getSession } from '@/lib/auth';
 import { systemQuery } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { upsertUser } from '@/lib/users';
 import { GET as subscribeGET } from '@/app/api/subscribe/route';
 import { GET as infoGET } from '@/app/api/subscribe/info/route';
@@ -70,9 +71,7 @@ afterAll(async () => {
   await systemQuery('DELETE FROM family_calendar.users WHERE id = ANY($1)', [
     [userId, strangerId],
   ]);
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = ANY($1)', [
-    [familyA, familyB],
-  ]);
+  await deleteFamilies(familyA, familyB);
 });
 
 beforeEach(() => {

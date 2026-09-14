@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { systemQuery, query } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { runWithTenant } from '@/lib/tenant';
 import { generateICalFeed } from '@/lib/ical';
 import { getOccurrencesInRange } from '@/lib/hebrew';
@@ -91,7 +92,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // family_members/events/gatherings all FK-cascade off families (migrate-v10).
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = $1', [familyId]);
+  await deleteFamilies(familyId);
 });
 
 describe('generateICalFeed — stable VEVENT UIDs', () => {

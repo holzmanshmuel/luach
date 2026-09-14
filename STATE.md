@@ -43,8 +43,9 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Where it stands
 
-- 2026-09-14: HOLZMAN-181 (#2) and HOLZMAN-183 (#4) merged and deployed. **HOLZMAN-182 (#3) is
-  merged only once `migrate-v17` has run on production** — see the 2026-09-14 log entry.
+- 2026-09-14: HOLZMAN-181 (#2), HOLZMAN-182 (#3) and HOLZMAN-183 (#4) merged and deployed.
+  Production schema is at **`migrate-v17`** (applied by the owner before #3 merged, verified:
+  `families_write_guard` enabled, `app_user` not a member of the owner role).
 - Tests: vitest. All three branches trial-merged on a fresh migrated database as the app role:
   **55 files / 684 tests, 0 skipped**. CI (`.github/workflows/ci.yml`) runs on push to main + PRs
   against a throwaway `postgres:16` service container and uses **no GitHub secrets** on purpose, so a
@@ -88,9 +89,10 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   🪤 **Mutation-checking a guard runs its "refused" writes for real.** Disabling the trigger on the
   shared local staging database let the test's cross-family UPDATE rename every family row there.
   Do that kind of check on a throwaway database.
-  ⚠ **Pending on production** until the owner runs
-  `DATABASE_URL='<owner URL from Railway calendar-db>' npx tsx scripts/migrate.ts`; merge #3 after.
-  No app code reads the trigger, so neither order can take the site down.
+  Applied to production as the owner BEFORE #3 merged, then verified read-only: the trigger is
+  enabled and the app's login role is not a member of the table owner (if it were, the guard would
+  exempt it and protect nothing). No app code reads the trigger, so neither order could have taken
+  the site down.
 - **HOLZMAN-183 — `/admin/dates`, `/admin/branches`, `/admin/names` are bilingual.** The `dir="ltr"`
   pins are gone; back-links use `backArrow(dir)`. Validators, draft warnings and the admin Server
   Actions return translation keys with data (`TMessage`), rendered by `<Message>` /

@@ -59,6 +59,7 @@ vi.mock('next/cache', () => ({
 
 import { getSession, requireEditor, withEditor } from '@/lib/auth';
 import { query, systemQuery } from '@/lib/db';
+import { deleteFamilies } from '@/test-stubs/families';
 import { getFamilyId, runWithTenant } from '@/lib/tenant';
 import { getT } from '@/lib/translations';
 import { createPersonAction, updatePersonRelationshipsAction } from '@/app/actions';
@@ -112,9 +113,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // families cascade to members, relationships and memberships.
-  await systemQuery('DELETE FROM family_calendar.families WHERE id = ANY($1)', [
-    [familyA, familyB],
-  ]);
+  await deleteFamilies(familyA, familyB);
   await systemQuery('DELETE FROM family_calendar.users WHERE id = $1', [userId]);
   cookieJar.clear();
 });
