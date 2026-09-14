@@ -330,6 +330,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'err.hebrew_day': 'Please set a Hebrew day (1–30), or enter a full English date.',
     'err.hebrew_month': 'Please choose a Hebrew month, or enter a full English date.',
     'err.dup_event': '{name} already has this occasion. Edit the existing one instead.',
+    'err.person_ambiguous': 'More than one family member is named “{name}”. Pick the right person from the suggestions.',
     'err.person_exists': '{name} already exists — you can add events to them from the calendar.',
     'err.name_clash': 'Another family member is already named “{name}”. Please use a different name.',
     // Shown when a submitted person id is not one of this family's people — a stale
@@ -734,6 +735,7 @@ export const T: Record<Lang, Record<string, string>> = {
     'err.hebrew_day': 'נא להגדיר יום עברי (1–30), או להזין תאריך לועזי מלא.',
     'err.hebrew_month': 'נא לבחור חודש עברי, או להזין תאריך לועזי מלא.',
     'err.dup_event': 'ל{name} כבר יש את האירוע הזה. ערכו את הקיים במקום.',
+    'err.person_ambiguous': 'יש יותר מבן משפחה אחד בשם “{name}”. בחרו את האדם הנכון מתוך ההצעות.',
     'err.person_exists': '{name} כבר קיים — אפשר להוסיף אירועים מהיומן.',
     'err.name_clash': 'כבר קיים בן משפחה בשם “{name}”. נא להשתמש בשם אחר.',
     'err.unknown_person': 'האדם הזה אינו במשפחה הזו — רעננו את הדף ונסו שוב.',

@@ -39,6 +39,34 @@ export function fullName(m: { name: string; last_name?: string | null }): string
   return last ? `${given} ${last}` : given;
 }
 
+/** A full name reduced to what identifies a person when typed: single spaces, no case. */
+export function fullNameKey(full: string): string {
+  return full.trim().split(/\s+/).filter(Boolean).join(' ').toLowerCase();
+}
+
+/**
+ * Ids of the people whose full name — as {@link fullName} renders it, which is how a
+ * person is shown in the Add-Event suggestions and so how their name gets typed — is
+ * `typed`, ignoring case and extra spaces. Matching on the given-name column alone
+ * never found "Miriam Cohen" and silently forked a second Miriam.
+ *
+ * A name can belong to more than one person, so this returns every match and the
+ * caller must not pick one. The same id appearing twice (a stored row and its
+ * respelled copy) counts once.
+ */
+export function idsMatchingFullName(
+  people: readonly { id: number; name: string; last_name?: string | null }[],
+  typed: string
+): number[] {
+  const key = fullNameKey(typed);
+  if (!key) return [];
+  const ids = new Set<number>();
+  for (const p of people) {
+    if (fullNameKey(fullName(p)) === key) ids.add(p.id);
+  }
+  return [...ids];
+}
+
 export function displayName(m: NameFields, lang: Lang, showNicknames = false): string {
   if (showNicknames && m.nickname) return clean(m.nickname);
   if (lang === 'he' && m.name_he) return clean(m.name_he);

@@ -9,7 +9,7 @@ import { namedBranches } from '@/lib/branches';
 import { familyBranches } from '@/lib/branches-server';
 import { getViewerSpelling, rewriteNames } from '@/lib/spellings';
 import { exactGregorianToHebrew } from '@/lib/hebrew';
-import { splitFullName } from '@/lib/names';
+import { idsMatchingFullName, splitFullName } from '@/lib/names';
 import { getT, type Lang } from '@/lib/translations';
 import { getGatheringsRaw } from '@/lib/calendar-data';
 
@@ -156,26 +156,41 @@ export async function createEventAction(
     if ('errorKey' in resolved) return { error: T(resolved.errorKey) };
 
     // Find or create family member. Prefer an explicit id (e.g. the person we just
-    // created in the Add-Person flow) so we never mis-link via a name lookup.
-    // Both lookups are tenant-scoped, so an id from another family finds nothing
-    // and falls through to creating a new person here — it can never be linked.
-    const members = data.family_member_id
-      ? await query<{ id: number }>(
-          'SELECT id FROM family_calendar.family_members WHERE id = $1',
-          [data.family_member_id]
-        )
-      : await query<{ id: number }>(
-          'SELECT id FROM family_calendar.family_members WHERE LOWER(name) = LOWER($1)',
-          [data.name.trim()]
-        );
-
-    let memberId: number;
-    if (members.length > 0) {
-      memberId = members[0].id;
+    // created in the Add-Person flow, or one picked from the suggestions) so we never
+    // mis-link via a name lookup. Every lookup here is tenant-scoped, so an id from
+    // another family finds nothing and falls through to creating a new person here —
+    // it can never be linked.
+    let memberId: number | undefined;
+    if (data.family_member_id) {
+      const rows = await query<{ id: number }>(
+        'SELECT id FROM family_calendar.family_members WHERE id = $1',
+        [data.family_member_id]
+      );
+      memberId = rows[0]?.id;
+    } else {
+      // The form collects a FULL name, so match it against each person's full name —
+      // the same fullName() the form's suggestion list shows — both as stored and as
+      // this viewer spells the family's surnames. This used to compare the typed full
+      // name with the given-name column alone, which never matched a person who has a
+      // surname: "Miriam Cohen" created a second Miriam, splitting her occasions
+      // across two people in the tree.
+      const people = await query<{ id: number; name: string; last_name: string | null; family_branch: string | null }>(
+        'SELECT id, name, last_name, family_branch FROM family_calendar.family_members'
+      );
+      const respelled = rewriteNames(people.map(p => ({ ...p })), await getViewerSpelling());
+      const ids = idsMatchingFullName([...people, ...respelled], data.name);
+      if (ids.length > 1) {
+        // Two people answer to this name. Picking one would attach the occasion to
+        // the wrong person without a trace; the suggestion list can tell them apart.
+        return { error: T('err.person_ambiguous', { name: data.name.trim() }) };
+      }
+      memberId = ids[0];
       // Do NOT overwrite an existing person's branch from an event entry — branch is
       // a person attribute managed in the family tree, not something an event should
       // silently re-categorise.
-    } else {
+    }
+
+    if (memberId === undefined) {
       // Creating a brand-new person from a single typed name — split off the surname
       // (last word) so they get a proper last_name like everyone else.
       const { given, last } = splitFullName(data.name);
