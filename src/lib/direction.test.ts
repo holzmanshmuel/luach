@@ -128,6 +128,19 @@ describe('no directional glyph is hard-coded in a direction-sensitive component'
     'app/components/FamilyTreeClient.tsx',
     'app/timeline/page.tsx',
     'app/admin/access/page.tsx',
+    'app/admin/dates/page.tsx',
+    'app/admin/branches/page.tsx',
+    'app/admin/names/page.tsx',
+  ];
+  /**
+   * Components on a direction-sensitive page that draw NO arrow at all. They are
+   * held to the same no-literal-glyph rule, but — having nothing to draw — are not
+   * required to import lib/direction.
+   */
+  const GLYPH_FREE = [
+    'app/admin/dates/DateProblemList.tsx',
+    'app/admin/branches/BranchesPanel.tsx',
+    'app/admin/names/ReviewNamesPanel.tsx',
   ];
   const GLYPHS = /[←→‹›]/;
 
@@ -141,7 +154,7 @@ describe('no directional glyph is hard-coded in a direction-sensitive component'
       .join('\n');
   }
 
-  for (const rel of GUARDED) {
+  for (const rel of [...GUARDED, ...GLYPH_FREE]) {
     it(rel, () => {
       const path = fileURLToPath(new URL(`./../${rel}`, import.meta.url));
       const code = stripComments(readFileSync(path, 'utf8'));
@@ -161,6 +174,13 @@ describe('no directional glyph is hard-coded in a direction-sensitive component'
     for (const rel of GUARDED) {
       const path = fileURLToPath(new URL(`./../${rel}`, import.meta.url));
       expect(readFileSync(path, 'utf8')).toMatch(/@\/lib\/direction|from '\.\.\/\.\.\/lib\/direction'/);
+    }
+  });
+
+  it('guards glyph-free files that really exist', () => {
+    for (const rel of GLYPH_FREE) {
+      const path = fileURLToPath(new URL(`./../${rel}`, import.meta.url));
+      expect(readFileSync(path, 'utf8').length).toBeGreaterThan(0);
     }
   });
 });

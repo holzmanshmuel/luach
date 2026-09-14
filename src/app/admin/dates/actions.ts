@@ -5,6 +5,8 @@ import { query } from '@/lib/db';
 import { withAdminOrError } from '@/lib/auth';
 import { setEventEnglishDate, setEventHebrewDate } from '@/lib/date-corrections';
 import { auditEvent, type AuditableEvent } from '@/lib/date-consistency';
+import { keyedDenial } from '@/lib/action-errors';
+import type { TMessage } from '@/lib/translations';
 
 /**
  * The two one-click corrections offered by the date-check page.
@@ -43,22 +45,34 @@ async function loadAuditableEvent(eventId: number): Promise<AuditableEvent | nul
   return rows[0] ?? null;
 }
 
+/*
+ * ── ERRORS ARE KEYS, NOT SENTENCES ──
+ * Both actions return a translation key (`TMessage`), never English text: the page
+ * is bilingual, and the client renders the key in the owner's language. A malformed
+ * id and a row outside this family read the same to the owner — "that event was not
+ * found" — so both use the calendar's existing `err.event_not_found`.
+ */
+type DateFixResult = { error?: TMessage };
+
+const EVENT_NOT_FOUND: TMessage = { key: 'err.event_not_found' };
+const ROW_IS_STALE: TMessage = { key: 'dates.err.stale' };
+
 /**
  * Trust the Hebrew date: rewrite the English date to the civil date that Hebrew
  * date actually fell on. This is the common case — the Hebrew date came from a
  * family memory and the English one from a mistyped spreadsheet cell.
  */
-export async function trustHebrewDateAction(eventId: number): Promise<{ error?: string }> {
-  if (!Number.isInteger(eventId) || eventId <= 0) return { error: 'Bad event id.' };
-  return withAdminOrError(async () => {
+export async function trustHebrewDateAction(eventId: number): Promise<DateFixResult> {
+  if (!Number.isInteger(eventId) || eventId <= 0) return { error: EVENT_NOT_FOUND };
+  return keyedDenial(await withAdminOrError(async (): Promise<DateFixResult> => {
     const event = await loadAuditableEvent(eventId);
-    if (!event) return { error: 'Event not found.' };
+    if (!event) return { error: EVENT_NOT_FOUND };
 
     const finding = auditEvent(event);
     if (finding.verdict !== 'mismatch' || !finding.expected_english) {
       // Nothing to correct — most likely someone else already fixed it, or the page
       // is stale. Say so rather than writing a no-op.
-      return { error: 'That row no longer needs correcting — reload the page.' };
+      return { error: ROW_IS_STALE };
     }
 
     await setEventEnglishDate(eventId, finding.expected_english);
@@ -68,7 +82,7 @@ export async function trustHebrewDateAction(eventId: number): Promise<{ error?: 
     revalidatePath('/timeline');
     revalidatePath('/admin/dates');
     return {};
-  });
+  }));
 }
 
 /**
@@ -76,15 +90,15 @@ export async function trustHebrewDateAction(eventId: number): Promise<{ error?: 
  * date that civil date actually fell on. For families whose civil dates come off
  * a birth certificate and whose Hebrew dates were worked out later by hand.
  */
-export async function trustEnglishDateAction(eventId: number): Promise<{ error?: string }> {
-  if (!Number.isInteger(eventId) || eventId <= 0) return { error: 'Bad event id.' };
-  return withAdminOrError(async () => {
+export async function trustEnglishDateAction(eventId: number): Promise<DateFixResult> {
+  if (!Number.isInteger(eventId) || eventId <= 0) return { error: EVENT_NOT_FOUND };
+  return keyedDenial(await withAdminOrError(async (): Promise<DateFixResult> => {
     const event = await loadAuditableEvent(eventId);
-    if (!event) return { error: 'Event not found.' };
+    if (!event) return { error: EVENT_NOT_FOUND };
 
     const finding = auditEvent(event);
     if (finding.verdict !== 'mismatch' || !finding.english_falls_on) {
-      return { error: 'That row no longer needs correcting — reload the page.' };
+      return { error: ROW_IS_STALE };
     }
 
     // english_falls_on is "<day> <Month> <hebrewYear>" — rebuild the parts rather
@@ -95,7 +109,7 @@ export async function trustEnglishDateAction(eventId: number): Promise<{ error?:
     const month = parts.slice(1, -1).join(' ');
     const hebrewYear = Number(parts[parts.length - 1]);
     if (!Number.isInteger(day) || !month || !Number.isInteger(hebrewYear)) {
-      return { error: 'Could not work out the Hebrew date — edit this one by hand.' };
+      return { error: { key: 'dates.err.no_hebrew' } };
     }
 
     await setEventHebrewDate(eventId, day, month, hebrewYear);
@@ -105,5 +119,5 @@ export async function trustEnglishDateAction(eventId: number): Promise<{ error?:
     revalidatePath('/timeline');
     revalidatePath('/admin/dates');
     return {};
-  });
+  }));
 }

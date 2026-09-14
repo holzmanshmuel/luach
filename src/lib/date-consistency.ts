@@ -78,6 +78,13 @@ export interface Finding {
   verdict: Verdict;
   /** e.g. `"12 Sivan"` — the stored recurring Hebrew date. */
   stored_hebrew: string;
+  /**
+   * The parts `stored_hebrew` is written from. A display localizes these (Hebrew
+   * numerals and month names on a Hebrew page) rather than re-parsing the English
+   * string above.
+   */
+  hebrew_day: number;
+  hebrew_month: string;
   /** e.g. `"1978-06-07"` — the stored civil date, or null. */
   stored_english: string | null;
   /**
@@ -85,6 +92,8 @@ export interface Finding {
    * `"2 Sivan 5738"`. This is the line that makes a typo obvious to a human.
    */
   english_falls_on: string | null;
+  /** `english_falls_on` as parts, for a localized display. Null exactly when it is. */
+  english_falls_on_parts: { day: number; month: string; hebrewYear: number } | null;
   /**
    * What the English date WOULD be if the Hebrew date is the correct one —
    * the suggested correction. `YYYY-MM-DD`, or null when unconvertible.
@@ -173,6 +182,8 @@ export function auditEvent(event: AuditableEvent): Finding {
     person_name: event.person_name,
     event_type: event.event_type,
     stored_hebrew: storedHebrew,
+    hebrew_day: event.hebrew_day,
+    hebrew_month: event.hebrew_month,
     stored_english: event.original_english_date,
   };
 
@@ -181,6 +192,7 @@ export function auditEvent(event: AuditableEvent): Finding {
       ...base,
       verdict: 'no_english',
       english_falls_on: null,
+      english_falls_on_parts: null,
       expected_english: null,
       offset_days: null,
     };
@@ -192,6 +204,7 @@ export function auditEvent(event: AuditableEvent): Finding {
       ...base,
       verdict: 'unconvertible',
       english_falls_on: null,
+      english_falls_on_parts: null,
       expected_english: null,
       offset_days: null,
     };
@@ -201,6 +214,9 @@ export function auditEvent(event: AuditableEvent): Finding {
   const englishFallsOn = englishAsHebrew
     ? formatHebrewDate(englishAsHebrew.day, englishAsHebrew.month, englishAsHebrew.hebrewYear)
     : null;
+  const englishFallsOnParts = englishAsHebrew
+    ? { day: englishAsHebrew.day, month: englishAsHebrew.month, hebrewYear: englishAsHebrew.hebrewYear }
+    : null;
 
   const target = new Date(parsed.y, parsed.m - 1, parsed.d);
   const occurrence = nearestHebrewOccurrence(event.hebrew_day, event.hebrew_month, target);
@@ -209,6 +225,7 @@ export function auditEvent(event: AuditableEvent): Finding {
       ...base,
       verdict: 'unconvertible',
       english_falls_on: englishFallsOn,
+      english_falls_on_parts: englishFallsOnParts,
       expected_english: null,
       offset_days: null,
     };
@@ -243,6 +260,7 @@ export function auditEvent(event: AuditableEvent): Finding {
     ...base,
     verdict,
     english_falls_on: englishFallsOn,
+    english_falls_on_parts: englishFallsOnParts,
     expected_english: ymdLocal(occurrence.date),
     offset_days: offset,
   };
