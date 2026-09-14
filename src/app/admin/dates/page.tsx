@@ -1,9 +1,14 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { auditEvents, type AuditableEvent } from '@/lib/date-consistency';
 import { cleanName } from '@/lib/names';
+import { getT, type Lang } from '@/lib/translations';
+import { backArrow, dirForLang } from '@/lib/direction';
+import { InterpolatedMany } from '@/app/components/Interpolated';
 import { DateProblemList } from './DateProblemList';
+import { eventTypeLabel, findingDates } from './finding-dates';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +24,19 @@ export const dynamic = 'force-dynamic';
  * Owner-only: the proxy coarse-gates /admin/* on the cached role and requireAdmin()
  * re-verifies it live AND establishes the tenant context the query() below needs,
  * so the report can only ever cover the caller's own family.
+ *
+ * Bilingual like /admin/access: the language comes from the `lang` cookie, the
+ * direction from `dirForLang`, and every sentence from translations.ts. People's
+ * names and the dates themselves are DATA — they are never translated, only
+ * `<bdi>`-isolated and formatted with the calendar's own date helpers.
  */
 export default async function DatesPage() {
   await requireAdmin();
+
+  const cookieStore = await cookies();
+  const lang: Lang = cookieStore.get('lang')?.value === 'he' ? 'he' : 'en';
+  const t = getT(lang);
+  const dir = dirForLang(lang);
 
   const rows = await query<AuditableEvent>(
     `SELECT e.id,
@@ -44,37 +59,34 @@ export default async function DatesPage() {
   const { summary, problems, adarChoices } = report;
   const checked = summary.ok + summary.nightfall + summary.mismatch + summary.adar_convention;
 
-  // dir="ltr" below is deliberate. This page is hardcoded English (like its
-  // sibling admin pages), but the root layout sets dir="rtl" for a Hebrew
-  // viewer — which scrambles the English text, reorders rows and turns
-  // "← Calendar" into "Calendar ←". Pinning the direction to the language the
-  // page is actually written in keeps it readable until it is translated.
   return (
-    <div dir="ltr" className="min-h-screen bg-parchment">
+    <div dir={dir} className="min-h-screen bg-parchment">
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <Link href="/" className="text-sm text-ink-muted hover:text-ink transition-colors">
-          ← Calendar
+        {/* The arrow is chosen from `dir` (lib/direction.ts), never typed into a
+            label — a literal one points the wrong way on the Hebrew page. */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors"
+        >
+          <span aria-hidden>{backArrow(dir)}</span>
+          {t('admin.back')}
         </Link>
-        <h1 className="font-display text-3xl text-ink mt-3 mb-1">Date check</h1>
-        <p className="text-ink-muted text-sm mb-6">
-          Every birthday and anniversary here has both a Hebrew date and an English date. They
-          should describe the same day. This page converts one to the other and shows you any that
-          disagree — almost always a typo in whichever list the dates were first written down in.
-        </p>
+        <h1 className="font-display text-3xl text-ink mt-3 mb-1">{t('dates.title')}</h1>
+        <p className="text-ink-muted text-sm mb-6">{t('dates.intro')}</p>
 
         <dl className="grid grid-cols-3 gap-3 mb-8 text-center">
-          <Stat value={checked} label="cross-checked" />
-          <Stat value={summary.mismatch} label="disagree" emphasis={summary.mismatch > 0} />
-          <Stat value={summary.no_english} label="no English date" />
+          <Stat value={checked} label={t('dates.stat_checked')} />
+          <Stat value={summary.mismatch} label={t('dates.stat_mismatch')} emphasis={summary.mismatch > 0} />
+          <Stat value={summary.no_english} label={t('dates.stat_no_english')} />
         </dl>
 
         {summary.mismatch === 0 && summary.unconvertible === 0 ? (
           <p className="border-y border-warm-border py-6 text-center text-sm text-ink-muted">
             {checked === 0
-              ? 'Nothing to check yet — add some birthdays and come back.'
+              ? t('dates.empty_nothing')
               : adarChoices.length > 0
-                ? 'No typos found. There is one leap-year question below.'
-                : 'Every date agrees. Nothing to fix. 🎉'}
+                ? t('dates.empty_adar_only')
+                : t('dates.all_agree')}
           </p>
         ) : (
           <DateProblemList problems={problems} />
@@ -82,47 +94,47 @@ export default async function DatesPage() {
 
         {adarChoices.length > 0 && (
           <section className="mt-10">
-            <h2 className="font-display text-xl text-ink mb-1">A leap-year Adar question</h2>
+            <h2 className="font-display text-xl text-ink mb-1">{t('dates.adar_heading')}</h2>
             <p className="text-ink-muted text-sm mb-4">
-              {adarChoices.length === 1 ? 'This event falls' : 'These events fall'} on the same day
-              of the month as recorded — but in a leap year, which has two Adars, and the two dates
-              point at different ones. <strong className="text-ink-2">Nothing here is mistyped.</strong>{' '}
-              This calendar observes a plain &ldquo;Adar&rdquo; occasion in{' '}
-              <strong className="text-ink-2">Adar II</strong>. If your family observes it in the
-              first Adar instead, open the person on the family tree and set the month explicitly to
-              &ldquo;Adar I&rdquo;. Otherwise leave it — it is already doing what it should.
+              {t(adarChoices.length === 1 ? 'dates.adar_intro_one' : 'dates.adar_intro_many')}{' '}
+              <strong className="text-ink-2">{t('dates.adar_not_mistyped')}</strong>{' '}
+              {t('dates.adar_rule')} {t('dates.adar_advice')}
             </p>
             <div className="border-y border-warm-border divide-y divide-warm-border/60">
-              {adarChoices.map(a => (
-                <div key={a.id} className="py-3">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-sm text-ink">{a.person_name}</span>
-                    <span className="label shrink-0">{a.event_type}</span>
+              {adarChoices.map(a => {
+                const d = findingDates(a, lang);
+                return (
+                  <div key={a.id} className="py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm text-ink"><bdi>{a.person_name}</bdi></span>
+                      <span className="label shrink-0">{eventTypeLabel(a.event_type, t)}</span>
+                    </div>
+                    <p className="text-xs text-ink-muted mt-1">
+                      <InterpolatedMany
+                        template={t('dates.adar_row')}
+                        params={{ hebrew: d.hebrew, english: d.english, falls_on: d.fallsOn }}
+                        valueClassName="text-ink-2"
+                      />
+                    </p>
                   </div>
-                  <p className="text-xs text-ink-muted mt-1">
-                    Recorded as <span className="text-ink-2">{a.stored_hebrew}</span>; the English
-                    date <span className="text-ink-2">{a.stored_english}</span> was{' '}
-                    <span className="text-ink-2">{a.english_falls_on}</span>.
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
 
         <div className="mt-8 space-y-3 text-xs text-ink-faint">
           <p>
-            <strong className="text-ink-muted">A one-day difference is not an error</strong> and is
-            not listed here. The Hebrew day begins at nightfall, so someone born on a Tuesday
-            evening has a Tuesday English birthday and a Wednesday Hebrew one. Only gaps of two days
-            or more are shown.
+            <strong className="text-ink-muted">{t('dates.nightfall_title')}</strong>{' '}
+            {t('dates.nightfall_body')}
           </p>
           {summary.no_english > 0 && (
             <p>
-              {summary.no_english}{' '}
-              {summary.no_english === 1 ? 'event has' : 'events have'} no English date recorded, so
-              there is nothing to cross-check. That is fine — the Hebrew date is all this calendar
-              needs.
+              {summary.no_english === 1 ? (
+                t('dates.no_english_one')
+              ) : (
+                <InterpolatedMany template={t('dates.no_english_many')} params={{ n: summary.no_english }} />
+              )}
             </p>
           )}
         </div>

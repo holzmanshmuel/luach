@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import type { Finding } from '@/lib/date-consistency';
+import type { TMessage } from '@/lib/translations';
+import { useUserPrefs } from '@/app/components/UserPrefsContext';
+import { InterpolatedMany, Message } from '@/app/components/Interpolated';
 import { trustEnglishDateAction, trustHebrewDateAction } from './actions';
+import { eventTypeLabel, findingDates } from './finding-dates';
 
 /**
  * The list of rows whose two dates disagree, each with the two possible readings
@@ -12,6 +16,9 @@ import { trustEnglishDateAction, trustHebrewDateAction } from './actions';
  * so this deliberately does NOT guess. It states both readings in plain language
  * and asks which is right. Neither button sends a date — each posts only the event
  * id, and the server re-derives the correction from the row itself.
+ *
+ * Language comes from `useUserPrefs()` (the root layout fills it from the same
+ * `lang` cookie the page reads), like every other client component in the app.
  */
 export function DateProblemList({ problems }: { problems: Finding[] }) {
   return (
@@ -23,23 +30,33 @@ export function DateProblemList({ problems }: { problems: Finding[] }) {
   );
 }
 
+const GAP_KEYS = {
+  earlier: { one: 'dates.gap_earlier_one', many: 'dates.gap_earlier_many' },
+  later: { one: 'dates.gap_later_one', many: 'dates.gap_later_many' },
+} as const;
+
 /**
- * "11 days earlier" / "1 day later" — the SIGN read out loud, never a bare number.
+ * "The English date is 11 days earlier than the Hebrew date implies." — the SIGN
+ * read out loud, never a bare number.
  *
  * `offset_days` is the stored English date minus the date the Hebrew one implies, so
- * a negative gap means the English date sits earlier in the year. The phrase has to
- * complete "The English date is ___ than the Hebrew date implies", which is why it
- * carries no "apart" — an earlier draft rendered "31 days earlier apart".
+ * a negative gap means the English date sits earlier in the year. Whole sentences
+ * per direction and per count, never a phrase dropped into a sentence: an earlier
+ * draft assembled the phrase and rendered "31 days earlier apart", and a Hebrew
+ * sentence cannot be assembled in English word order at all.
  */
-function gapPhrase(offsetDays: number): string {
+function gapMessage(offsetDays: number): TMessage {
   const n = Math.abs(offsetDays);
-  return `${n} ${n === 1 ? 'day' : 'days'} ${offsetDays < 0 ? 'earlier' : 'later'}`;
+  const keys = offsetDays < 0 ? GAP_KEYS.earlier : GAP_KEYS.later;
+  return n === 1 ? { key: keys.one } : { key: keys.many, params: { n } };
 }
 
 function ProblemRow({ problem: p }: { problem: Finding }) {
+  const { t, language } = useUserPrefs();
   const [done, setDone] = useState<'hebrew' | 'english' | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<TMessage | null>(null);
   const [isPending, start] = useTransition();
+  const d = findingDates(p, language);
 
   function fix(which: 'hebrew' | 'english') {
     setError(null);
@@ -51,14 +68,22 @@ function ProblemRow({ problem: p }: { problem: Finding }) {
     });
   }
 
+  const person = (
+    <div className="text-sm text-ink">
+      <bdi>{p.person_name}</bdi>
+    </div>
+  );
+
   if (p.verdict === 'unconvertible') {
     return (
       <div className="py-4">
-        <div className="text-sm text-ink">{p.person_name}</div>
+        {person}
         <p className="text-xs text-ink-muted mt-1">
-          Could not read these dates: <span className="text-ink-2">{p.stored_hebrew}</span> and{' '}
-          <span className="text-ink-2">{p.stored_english ?? '—'}</span>. Open this person on the
-          family tree and re-enter the date.
+          <InterpolatedMany
+            template={t('dates.unreadable')}
+            params={{ hebrew: d.hebrew, english: d.english }}
+            valueClassName="text-ink-2"
+          />
         </p>
       </div>
     );
@@ -67,10 +92,10 @@ function ProblemRow({ problem: p }: { problem: Finding }) {
   if (done) {
     return (
       <div className="py-4">
-        <div className="text-sm text-ink">{p.person_name}</div>
+        {person}
         <p className="text-xs text-ink-muted mt-1">
-          Fixed — the {done === 'hebrew' ? 'English' : 'Hebrew'} date now matches the{' '}
-          {done === 'hebrew' ? 'Hebrew' : 'English'} one. Reload to re-check.
+          {/* Trusting the Hebrew date rewrites the ENGLISH one, and vice versa. */}
+          {t(done === 'hebrew' ? 'dates.fixed_english' : 'dates.fixed_hebrew')}
         </p>
       </div>
     );
@@ -79,51 +104,51 @@ function ProblemRow({ problem: p }: { problem: Finding }) {
   return (
     <div className="py-4">
       <div className="flex items-baseline justify-between gap-3">
-        <div className="text-sm text-ink">{p.person_name}</div>
-        <div className="label shrink-0">{p.event_type}</div>
+        {person}
+        <div className="label shrink-0">{eventTypeLabel(p.event_type, t)}</div>
       </div>
 
       <p className="text-xs text-ink-muted mt-1.5">
         {p.offset_days !== null ? (
-          <>
-            The English date is{' '}
-            <span className="text-ink-2">{gapPhrase(p.offset_days)}</span> than the Hebrew date
-            implies.
-          </>
+          <Message t={t} message={gapMessage(p.offset_days)} valueClassName="text-ink-2" />
         ) : (
-          'These two dates are far apart.'
+          t('dates.far_apart')
         )}{' '}
-        One of them is wrong — which one?
+        {t('dates.which_wrong')}
       </p>
 
       <div className="mt-3 space-y-2.5">
         <Option
-          label="The Hebrew date is right"
+          label={t('dates.trust_hebrew')}
           detail={
-            <>
-              <span className="text-ink-2">{p.stored_hebrew}</span> fell on{' '}
-              <span className="text-ink-2">{p.expected_english}</span>, so the English date should be
-              that instead of <span className="text-ink-2">{p.stored_english}</span>.
-            </>
+            <InterpolatedMany
+              template={t('dates.trust_hebrew_detail')}
+              params={{ hebrew: d.hebrew, expected: d.expected, english: d.english }}
+              valueClassName="text-ink-2"
+            />
           }
           onClick={() => fix('hebrew')}
           disabled={isPending}
         />
         <Option
-          label="The English date is right"
+          label={t('dates.trust_english')}
           detail={
-            <>
-              <span className="text-ink-2">{p.stored_english}</span> was actually{' '}
-              <span className="text-ink-2">{p.english_falls_on}</span>, so the Hebrew date should be
-              that instead of <span className="text-ink-2">{p.stored_hebrew}</span>.
-            </>
+            <InterpolatedMany
+              template={t('dates.trust_english_detail')}
+              params={{ english: d.english, falls_on: d.fallsOn, hebrew: d.hebrew }}
+              valueClassName="text-ink-2"
+            />
           }
           onClick={() => fix('english')}
           disabled={isPending}
         />
       </div>
 
-      {error && <p className="text-xs text-accent mt-2">{error}</p>}
+      {error && (
+        <p className="text-xs text-accent mt-2">
+          <Message t={t} message={error} />
+        </p>
+      )}
     </div>
   );
 }
