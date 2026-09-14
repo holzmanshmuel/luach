@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { T, getT, splitTemplate, Lang } from '@/lib/translations';
+import {
+  T,
+  getT,
+  splitTemplate,
+  Lang,
+  templateParts,
+  templatePlaceholders,
+  fillTemplate,
+  formatMessage,
+} from '@/lib/translations';
 
 /**
  * getT() falls back to English for any key missing from the Hebrew table
@@ -151,5 +160,75 @@ describe('splitTemplate', () => {
 
   it('ignores a different placeholder in the same string', () => {
     expect(splitTemplate('{a} and {b}', 'b')).toEqual(['{a} and ', '']);
+  });
+});
+
+/**
+ * Sentences with SEVERAL data values ("Recorded as {hebrew}; the English date
+ * {english} was {falls_on}."). Each value still has to be isolated on its own, so
+ * the template is split into every part rather than around one placeholder.
+ */
+describe('templateParts / fillTemplate / formatMessage', () => {
+  it('splits text and every placeholder, in order', () => {
+    expect(templateParts('Recorded as {hebrew}; was {falls_on}.')).toEqual([
+      { text: 'Recorded as ' },
+      { placeholder: 'hebrew' },
+      { text: '; was ' },
+      { placeholder: 'falls_on' },
+      { text: '.' },
+    ]);
+  });
+
+  it('handles adjacent placeholders, a plain string and an empty one', () => {
+    expect(templateParts('{a}{b}')).toEqual([{ placeholder: 'a' }, { placeholder: 'b' }]);
+    expect(templateParts('plain')).toEqual([{ text: 'plain' }]);
+    expect(templateParts('')).toEqual([]);
+  });
+
+  it('lists the distinct placeholders, for parity checks', () => {
+    expect(templatePlaceholders('{b} then {a} then {b}')).toEqual(['a', 'b']);
+  });
+
+  it('fills a plain string for attributes, joining a list with commas', () => {
+    expect(fillTemplate('Remove "{name}"', { name: 'Levi' })).toBe('Remove "Levi"');
+    expect(fillTemplate('{n} branches: {names}.', { n: 2, names: ['Levi', 'Cohen'] })).toBe(
+      '2 branches: Levi, Cohen.'
+    );
+  });
+
+  it('renders a missing value as nothing, never as a literal placeholder', () => {
+    expect(fillTemplate('Colour {n}')).toBe('Colour ');
+  });
+
+  it('formatMessage renders a key in the language it is asked for', () => {
+    const msg = { key: 'branches.err.duplicate', params: { name: 'Levi' } };
+    expect(formatMessage(getT('en'), msg)).toBe('"Levi" is listed twice. Each branch needs its own name.');
+    const he = formatMessage(getT('he'), msg);
+    expect(he).toContain('Levi');
+    expect(he).not.toBe(formatMessage(getT('en'), msg));
+  });
+});
+
+/**
+ * The three owner admin pages were hardcoded English and pinned `dir="ltr"`. Their
+ * copy now lives here. Two things can silently go wrong with it: a Hebrew string
+ * that was never written (getT falls back to English, inside an RTL page), and a
+ * Hebrew string that dropped a placeholder (it renders fine and stops naming the
+ * branch, the date, or the count).
+ */
+describe('owner admin page copy (/admin/dates, /admin/branches, /admin/names)', () => {
+  const PREFIXES = ['admin.', 'dates.', 'branches.', 'names.'];
+  const keys = Object.keys(T.en).filter(k => PREFIXES.some(p => k.startsWith(p)));
+
+  it('is present in both languages and genuinely translated', () => {
+    expect(keys.length).toBeGreaterThan(80);
+    expect(keys.filter(k => getT('he')(k) === getT('en')(k))).toEqual([]);
+  });
+
+  it('keeps exactly the same placeholders in Hebrew as in English', () => {
+    const drift = keys
+      .filter(k => templatePlaceholders(T.en[k]).join() !== templatePlaceholders(T.he[k] ?? '').join())
+      .map(k => `${k}: en {${templatePlaceholders(T.en[k])}} vs he {${templatePlaceholders(T.he[k] ?? '')}}`);
+    expect(drift).toEqual([]);
   });
 });
