@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { FamilyBranch } from '@/lib/types';
 import { formatMessage } from '@/lib/translations';
+import { SAVE_FAILED } from '@/lib/action-errors';
 import {
   updatePersonAction,
   updatePersonPhotoAction,
@@ -206,9 +207,29 @@ export function EditPersonModal({ person, onClose }: Props) {
       if (photoChanged) {
         calls.push(updatePersonPhotoAction({ id: person.id, photoDataUrl }));
       }
-      const results = await Promise.all(calls);
-      const err = results.find(r => r.error)?.error;
-      if (err) setError(err);
+      // allSettled, not all. `Promise.all` rejects on the FIRST rejection and
+      // discards what the others answered, so two things went wrong at once: a
+      // photo upload dying on the wire hid a name clash the person could actually
+      // have fixed, and — because nothing caught the rejection — the transition
+      // simply ended. No banner, modal still open, the click looked like it had
+      // done nothing. That is the failure HOLZMAN-185 fixed on /admin/names, in
+      // this surface (HOLZMAN-194).
+      const settled = await Promise.allSettled(calls);
+      const refusals = settled.flatMap(s =>
+        s.status === 'fulfilled' && s.value.error ? [s.value.error] : []
+      );
+      const rejections = settled.flatMap(s => (s.status === 'rejected' ? [s.reason] : []));
+      // Swallowed for the reader, kept for whoever debugs it.
+      for (const reason of rejections) {
+        console.error('EditPersonModal: a save action rejected', reason);
+      }
+
+      // A reason the person can act on beats the generic one. Only when every
+      // failure is a rejection is there nothing specific left to say — and then
+      // "reload and try again" is the honest advice, because some of these writes
+      // may have landed and others not.
+      if (refusals.length) setError(refusals[0]);
+      else if (rejections.length) setError(formatMessage(t, SAVE_FAILED));
       else onClose();
     });
   }
