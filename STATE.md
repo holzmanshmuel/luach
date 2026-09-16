@@ -43,16 +43,17 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Where it stands
 
-- 2026-09-16: HOLZMAN-185 merged — the last English-only admin error is gone. No schema change.
+- 2026-09-16: HOLZMAN-185 and HOLZMAN-194 merged — the last English-only admin error is gone, and
+  neither surface swallows a failed save any more. No schema change.
 - 2026-09-14: HOLZMAN-181 (#2), HOLZMAN-182 (#3) and HOLZMAN-183 (#4) merged and deployed.
   Production schema is at **`migrate-v17`** (applied by the owner before #3 merged, verified:
   `families_write_guard` enabled, `app_user` not a member of the owner role).
-- Tests: vitest, **56 files / 703 tests, 0 skipped**. One file (`names-error.test.tsx`) runs under
-  jsdom via a `// @vitest-environment jsdom` docblock; everything else stays on the `node`
-  environment the config sets. CI (`.github/workflows/ci.yml`) runs on push to main + PRs
-  against a throwaway `postgres:16` service container and uses **no GitHub secrets** on purpose, so a
-  fork's CI runs unmodified: migrate → create+grant restricted role → assert not superuser/bypassrls
-  → lint → build → `tsc --noEmit` → `vitest run`.
+- Tests: vitest, **57 files / 708 tests, 0 skipped**. Two files (`names-error.test.tsx`,
+  `edit-person-error.test.tsx`) run under jsdom via a `// @vitest-environment jsdom` docblock;
+  everything else stays on the `node` environment the config sets. CI (`.github/workflows/ci.yml`)
+  runs on push to main + PRs against a throwaway `postgres:16` service container and uses **no
+  GitHub secrets** on purpose, so a fork's CI runs unmodified: migrate → create+grant restricted
+  role → assert not superuser/bypassrls → lint → build → `tsc --noEmit` → `vitest run`.
 - Scheduled work is external. On the reference deployment ONE n8n job runs daily at 08:00
   Asia/Jerusalem and calls `/api/digest/daily` per family (recipients = members with a phone). The
   legacy `/api/digest/week` and `/api/reminders/yahrzeit` schedules are deactivated, and
@@ -62,7 +63,7 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Log
 
-### 2026-09-16 — the last English-only error, and the first test that clicks
+### 2026-09-16 — the last English-only error, and the first tests that click
 
 - **HOLZMAN-185 — a refused Hebrew-name save told the owner nothing at all.** `setHebrewNameAction`
   returned `withEditor`'s English sentence and `ReviewNamesPanel` discarded it: a viewer-role member,
@@ -100,8 +101,21 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   secrets. jsdom also has no global `CSS.escape`, and `useId()` ids (`«r0»`) are not valid CSS
   selectors, so reach the error element with `getElementById`.
   ⚠ `EditPersonModal` also calls this action; its banner is still a plain string, so the message is
-  flattened there with `formatMessage`. Its `Promise.all` has no catch, so a REJECTED action still
-  shows nothing in that modal — the same failure in the other surface (HOLZMAN-194).
+  flattened there with `formatMessage`. Its own version of the silent failure is HOLZMAN-194, below.
+
+- **HOLZMAN-194 — the same silence in the edit-person modal, plus a reason it threw away.** The modal
+  fires up to four Server Actions and awaited them with `Promise.all`, which **rejects on the first
+  rejection and discards what the others answered**. So a rejected action ended the transition with
+  no banner and the modal still open (the /admin/names bug in a second surface), and when two calls
+  failed differently the rejection won: a photo dying on the wire hid a name clash the person could
+  actually have fixed. `Promise.allSettled` now, with a returned refusal beating the generic
+  `err.save_failed`, and every rejection logged.
+  🪤 **A fixture that edits nothing fires ONE action, and a two-failure test written on it is
+  vacuous.** Each call is conditional — the modal only writes a field the user actually changed — so
+  the first version of the two-failure case passed against `Promise.all` as well, proving nothing.
+  The test now types into the Hebrew-name input first (native value setter + an `input` event, or
+  React never sees it) so a second action really is in flight. Mutation-checked after that fix:
+  restoring `Promise.all` fails 3 of its 5 cases, where before it failed 2.
 
 ### 2026-09-14 — a typed name forked people; `families` gets a database backstop; admin pages go bilingual
 
