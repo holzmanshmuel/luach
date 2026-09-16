@@ -445,6 +445,21 @@ export const T: Record<Lang, Record<string, string>> = {
     'err.event_not_found': 'That event was not found.',
     'err.login_required': 'Please log in.',
     'err.delete_admin': 'Only the family admin can delete things.',
+    // The soft member guards' four refusals (lib/auth.ts), keyed in
+    // lib/action-errors.ts — which holds the English wording, so these four stay
+    // word-for-word what the guard says (action-errors.test.ts asserts it). Each
+    // asks the reader for a different thing, so they stay four sentences rather
+    // than one "not allowed". They are NOT folded into the near-neighbours above
+    // (err.login_required, err.delete_admin): those are older strings with their
+    // own callers and slightly different wording, and pinning the guard's English
+    // to a key someone else can reword is how the drift starts.
+    'err.not_signed_in': 'Please sign in.',
+    'err.not_a_member': 'You are not a member of this family.',
+    'err.view_only': 'You have view-only access.',
+    'err.owner_only_delete': 'Only the family owner can delete things.',
+    // The fail-closed default: a refusal with no key of its own, or an action that
+    // never answered at all. Says what happened (nothing was saved) and what to do.
+    'err.save_failed': 'That change was not saved. Please reload the page and try again.',
     'err.too_many_attempts': 'Too many attempts. Please wait a few minutes and try again.',
     'err.wrong_password': 'Incorrect password. Ask a family member for access.',
     'err.enter_password': 'Please enter the family password.',
@@ -943,6 +958,11 @@ export const T: Record<Lang, Record<string, string>> = {
     'err.event_not_found': 'האירוע לא נמצא.',
     'err.login_required': 'נא להתחבר.',
     'err.delete_admin': 'רק מנהל המשפחה יכול למחוק.',
+    'err.not_signed_in': 'נא להתחבר.',
+    'err.not_a_member': 'אינכם חברים במשפחה הזו.',
+    'err.view_only': 'יש לכם הרשאת צפייה בלבד.',
+    'err.owner_only_delete': 'רק מנהל המשפחה רשאי למחוק.',
+    'err.save_failed': 'השינוי לא נשמר. רעננו את הדף ונסו שוב.',
     'err.too_many_attempts': 'יותר מדי ניסיונות. נא להמתין כמה דקות ולנסות שוב.',
     'err.wrong_password': 'סיסמה שגויה. בקשו גישה מבן משפחה.',
     'err.enter_password': 'נא להזין את הסיסמה המשפחתית.',

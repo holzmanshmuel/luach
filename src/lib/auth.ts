@@ -2,6 +2,12 @@ import { getIronSession, SessionOptions } from 'iron-session';
 import { cookies } from 'next/headers';
 import { enterTenant, runWithTenant } from '@/lib/tenant';
 import { getMembership, type MembershipRole } from '@/lib/users';
+import {
+  NOT_A_MEMBER,
+  NOT_SIGNED_IN,
+  OWNER_ONLY_DELETE,
+  VIEW_ONLY,
+} from '@/lib/action-errors';
 
 export interface SessionData {
   /** The signed-in user (Google account). Signed in ⇔ `!!userId`. */
@@ -214,11 +220,11 @@ export async function withAdminOrError<T>(
 }
 
 // Denial messages for the soft member guards. Held as constants because each is
-// used by both a guard and its wrapper, and the wording reaches users verbatim.
-const NOT_SIGNED_IN = 'Please sign in.';
-const NOT_A_MEMBER = 'You are not a member of this family.';
-const VIEW_ONLY = 'You have view-only access.';
-const OWNER_ONLY_DELETE = 'Only the family owner can delete things.';
+// used by both a guard and its wrapper, and the wording reaches users verbatim —
+// which is also why the sentences themselves live in lib/action-errors.ts, next to
+// the translation key each one maps to. A second copy here would drift out of that
+// mapping in silence, and the reader would get the generic fallback instead of the
+// reason. That module is pure, so importing it costs this one nothing.
 
 /**
  * Shared by the soft member guards (editor/deleter) and their wrappers.

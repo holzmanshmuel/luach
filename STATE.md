@@ -43,11 +43,13 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Where it stands
 
+- 2026-09-16: HOLZMAN-185 merged — the last English-only admin error is gone. No schema change.
 - 2026-09-14: HOLZMAN-181 (#2), HOLZMAN-182 (#3) and HOLZMAN-183 (#4) merged and deployed.
   Production schema is at **`migrate-v17`** (applied by the owner before #3 merged, verified:
   `families_write_guard` enabled, `app_user` not a member of the owner role).
-- Tests: vitest. All three branches trial-merged on a fresh migrated database as the app role:
-  **55 files / 684 tests, 0 skipped**. CI (`.github/workflows/ci.yml`) runs on push to main + PRs
+- Tests: vitest, **56 files / 703 tests, 0 skipped**. One file (`names-error.test.tsx`) runs under
+  jsdom via a `// @vitest-environment jsdom` docblock; everything else stays on the `node`
+  environment the config sets. CI (`.github/workflows/ci.yml`) runs on push to main + PRs
   against a throwaway `postgres:16` service container and uses **no GitHub secrets** on purpose, so a
   fork's CI runs unmodified: migrate → create+grant restricted role → assert not superuser/bypassrls
   → lint → build → `tsc --noEmit` → `vitest run`.
@@ -59,6 +61,38 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   still set it.
 
 ## Log
+
+### 2026-09-16 — the last English-only error, and the first test that clicks
+
+- **HOLZMAN-185 — a refused Hebrew-name save told the owner nothing at all.** `setHebrewNameAction`
+  returned `withEditor`'s English sentence and `ReviewNamesPanel` discarded it: a viewer-role member,
+  or a tab whose session had expired overnight, clicked Confirm and **nothing on screen changed** —
+  no error, no saved row, no hint which of the two had happened. The action now returns a `TMessage`
+  like the dates and branches actions, and the row renders it under the name it belongs to (not a
+  page-level banner: several rows are on screen and a banner cannot say which spelling failed).
+  The four soft-guard denials (`Please sign in.` / `You are not a member of this family.` /
+  `You have view-only access.` / `Only the family owner can delete things.`) moved from `lib/auth.ts`
+  into `lib/action-errors.ts`, beside the keys they map to, and `auth.ts` imports them — **two copies
+  of a user-facing sentence drift apart in silence**, and the drift is invisible: the guard refuses,
+  the mapper does not recognise its own wording, and the reader gets the generic fallback instead of
+  the reason. `action-errors.test.ts` asserts `T.en[key]` is the guard's sentence word-for-word, and
+  that `auth.ts` holds no second copy.
+  🪤 **`MEMBER_DENIAL[s] ?? FALLBACK` does not fail closed.** A plain object literal inherits
+  `Object.prototype`, so `'constructor'` answers with a FUNCTION and `'__proto__'` with an object —
+  both truthy, so the `??` never fires and the non-message reaches `<Message>` as `t(undefined)` and
+  crashes the render. `Object.hasOwn` instead, with the inherited keys in the test. No caller can
+  reach it today (the only strings in are the four constants); the guard is so that none ever can.
+  🪤 **A static render can never reach an error that only exists after a click.** Every component
+  test here renders through `renderToStaticMarkup`, which is why this bug had no test to fail:
+  the error state is reachable only by clicking. `names-error.test.tsx` is the first file to drive a
+  real DOM — `// @vitest-environment jsdom`, `createRoot` + React's `act`, `button.click()` — and it
+  asserts the sentence the owner reads in each language, not the key. Mutation-checked: deleting the
+  error `<p>` fails 6 of its 9 cases, deleting the `catch` fails exactly the two rejection cases, and
+  unwrapping `keyedMemberDenial` fails `tsc` rather than any test (the return type is the proof that
+  an English string cannot come back).
+  ⚠ `EditPersonModal` also calls this action; its banner is still a plain string, so the message is
+  flattened there with `formatMessage`. Its `Promise.all` has no catch, so a REJECTED action still
+  shows nothing in that modal — the same failure in the other surface (HOLZMAN-194).
 
 ### 2026-09-14 — a typed name forked people; `families` gets a database backstop; admin pages go bilingual
 
@@ -101,7 +135,8 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   Latin surname never drags punctuation out of place. Dates use the calendar's own localized
   formatters. Hebrew "branch" is **שבט** throughout (the header's `nav.branches` changed from ענפי
   משפחה to match `person.branch` and the tree filter). ⚠ The Hebrew is a working draft and wants a
-  native read. Still English: `setHebrewNameAction`'s errors in `actions.ts`.
+  native read. Still English: `setHebrewNameAction`'s errors in `actions.ts` — closed 2026-09-16 by
+  HOLZMAN-185, below.
 
 ### 2026-09-10 — every relative outside Israel saw every date a day early
 
