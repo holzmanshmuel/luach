@@ -90,6 +90,15 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   error `<p>` fails 6 of its 9 cases, deleting the `catch` fails exactly the two rejection cases, and
   unwrapping `keyedMemberDenial` fails `tsc` rather than any test (the return type is the proof that
   an English string cannot come back).
+  🪤 **A test dependency has its own Node floor, and the local machine hides it.** `jsdom@30` needs
+  Node ≥ 22.22; CI and `Dockerfile` are both Node **20**. `npm install` and the whole suite were green
+  locally (Node 24), and CI did not error on install either — it ran **55 files / 694 tests**, one file
+  and one environment short, with the new file's failure filed as an "unhandled error"
+  (`webidl.util.markAsUncloneable is not a function`, out of undici). A test that does not run looks a
+  lot like a test that passes: check the FILE COUNT, not just the colour. Pinned to `jsdom@^26`
+  (`engines: node >=18`) so a fork on Node 18 or 20 runs it unmodified — the same reason CI uses no
+  secrets. jsdom also has no global `CSS.escape`, and `useId()` ids (`«r0»`) are not valid CSS
+  selectors, so reach the error element with `getElementById`.
   ⚠ `EditPersonModal` also calls this action; its banner is still a plain string, so the message is
   flattened there with `formatMessage`. Its `Promise.all` has no catch, so a REJECTED action still
   shows nothing in that modal — the same failure in the other surface (HOLZMAN-194).

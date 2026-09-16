@@ -138,9 +138,9 @@ describe('/admin/names — a refused save', () => {
     const describedBy = input.getAttribute('aria-describedby');
     expect(input.getAttribute('aria-invalid')).toBe('true');
     expect(describedBy, 'the refused input should name its error element').toBeTruthy();
-    expect(container.querySelector(`#${CSS.escape(describedBy!)}`)?.textContent).toBe(
-      T.he['err.view_only']
-    );
+    // getElementById, not querySelector: useId() ids look like «r0» and are not
+    // valid CSS selectors, and jsdom has no global CSS.escape to fix that up.
+    expect(document.getElementById(describedBy!)?.textContent).toBe(T.he['err.view_only']);
   });
 
   it.each(['en', 'he'] as Lang[])(
