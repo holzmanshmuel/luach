@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { FamilyBranch } from '@/lib/types';
+import { formatMessage } from '@/lib/translations';
 import {
   updatePersonAction,
   updatePersonPhotoAction,
@@ -162,6 +163,11 @@ export function EditPersonModal({ person, onClose }: Props) {
     if (!editName.trim()) { setError(t('err.name_required')); return; }
     setError(null);
     startTransition(async () => {
+      // This modal's banner is a plain string (the other three actions still
+      // answer in English sentences), so the one action that now returns a
+      // TMessage is flattened here with formatMessage — which at least means a
+      // Hebrew viewer gets the refusal in Hebrew. The banner keeps no <bdi>, but
+      // none of these messages carries data to isolate.
       const calls: Promise<{ error?: string }>[] = [
         updatePersonAction({
           id: person.id,
@@ -191,7 +197,11 @@ export function EditPersonModal({ person, onClose }: Props) {
       }
       // Only (re)confirm the Hebrew name when the user actually edited it.
       if (editNameHe.trim() !== loadedNameHe.current.trim()) {
-        calls.push(setHebrewNameAction({ id: person.id, name_he: editNameHe }));
+        calls.push(
+          setHebrewNameAction({ id: person.id, name_he: editNameHe }).then(res => ({
+            error: res.error ? formatMessage(t, res.error) : undefined,
+          }))
+        );
       }
       if (photoChanged) {
         calls.push(updatePersonPhotoAction({ id: person.id, photoDataUrl }));

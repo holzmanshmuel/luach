@@ -10,7 +10,8 @@ import { familyBranches } from '@/lib/branches-server';
 import { getViewerSpelling, rewriteNames } from '@/lib/spellings';
 import { exactGregorianToHebrew } from '@/lib/hebrew';
 import { idsMatchingFullName, splitFullName } from '@/lib/names';
-import { getT, type Lang } from '@/lib/translations';
+import { getT, type Lang, type TMessage } from '@/lib/translations';
+import { keyedMemberDenial } from '@/lib/action-errors';
 import { getGatheringsRaw } from '@/lib/calendar-data';
 
 /**
@@ -618,11 +619,23 @@ export async function updatePersonPhotoAction(data: {
   });
 }
 
+/**
+ * Confirm (or clear) one person's Hebrew spelling, from /admin/names or the tree's
+ * edit-person modal.
+ *
+ * Its errors are translation keys, not English sentences. Nothing here validates —
+ * any Hebrew spelling is the family's own business, and an empty box deliberately
+ * means "no Hebrew name, fall back to the Latin one" — so the only refusal is the
+ * editor guard's, and `keyedMemberDenial` is what turns its four English denials
+ * into keys the bilingual panel can render. Before that, a viewer-role member (or a
+ * tab whose session had expired) clicked Confirm and the refusal went nowhere:
+ * the row simply did not save, with nothing on screen to say so.
+ */
 export async function setHebrewNameAction(data: {
   id: number;
   name_he: string;
-}): Promise<{ error?: string }> {
-  return withEditor(async () => {
+}): Promise<{ error?: TMessage }> {
+  return keyedMemberDenial(await withEditor(async (): Promise<{ error?: TMessage }> => {
     const value = data.name_he.trim();
     await query(
       `UPDATE family_calendar.family_members
@@ -634,7 +647,7 @@ export async function setHebrewNameAction(data: {
     revalidatePath('/tree');
     revalidatePath('/admin/names');
     return {};
-  });
+  }));
 }
 
 // ── Gatherings (one-off family simchas: weddings, bar/bat mitzvahs, britot, …) ─
