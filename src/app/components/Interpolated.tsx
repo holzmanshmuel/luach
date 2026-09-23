@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import {
   splitTemplate,
   templateParts,
+  withoutRepeatedArticle,
   type TMessage,
   type TParam,
   type TParams,
@@ -33,7 +34,7 @@ export function Interpolated({
   return (
     <>
       {before}
-      <bdi>{value}</bdi>
+      <bdi>{withoutRepeatedArticle(before, value)}</bdi>
       {after}
     </>
   );
@@ -58,15 +59,18 @@ export function InterpolatedMany({
   params?: TParams;
   valueClassName?: string;
 }) {
+  const parts = templateParts(template);
   return (
     <>
-      {templateParts(template).map((part, i) =>
-        'text' in part ? (
-          <Fragment key={i}>{part.text}</Fragment>
-        ) : (
-          <IsolatedValue key={i} value={params?.[part.placeholder]} className={valueClassName} />
-        )
-      )}
+      {parts.map((part, i) => {
+        if ('text' in part) return <Fragment key={i}>{part.text}</Fragment>;
+        const before = parts[i - 1];
+        let value = params?.[part.placeholder];
+        if (typeof value === 'string' && before && 'text' in before) {
+          value = withoutRepeatedArticle(before.text, value);
+        }
+        return <IsolatedValue key={i} value={value} className={valueClassName} />;
+      })}
     </>
   );
 }

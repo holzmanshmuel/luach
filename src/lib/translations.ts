@@ -1126,6 +1126,24 @@ function paramText(value: TParam | undefined): string {
   return value.join(', ');
 }
 
+const ENDS_WITH_THE = /\bthe\s+$/i;
+const STARTS_WITH_THE = /^the\s+/i;
+
+/**
+ * The value to substitute after `textBefore`, minus its own leading "The" when the
+ * sentence already supplies one — so "invited to the {family} calendar" with a family
+ * called "The Levi Family" reads "the Levi Family calendar", not "the The Levi Family
+ * calendar" (HOLZMAN-201). The onboarding placeholder itself suggests "The Levy
+ * Family", so most English family names start that way.
+ *
+ * Every place a template is filled goes through this, so the rule holds for any
+ * sentence written "the {x}", not only the six invite strings that exposed it. Whole
+ * words only: "breathe " before or "Theodore" as the value are left alone.
+ */
+export function withoutRepeatedArticle(textBefore: string, value: string): string {
+  return ENDS_WITH_THE.test(textBefore) ? value.replace(STARTS_WITH_THE, '') : value;
+}
+
 /**
  * Fill a template into a PLAIN string. For the places `<bdi>` cannot reach — an
  * attribute (`title`, `aria-label`) or a log/Error message. Anything a reader sees
@@ -1133,9 +1151,11 @@ function paramText(value: TParam | undefined): string {
  * value renders as nothing, never as a literal `{name}` on screen.
  */
 export function fillTemplate(template: string, params: TParams = {}): string {
-  return templateParts(template)
-    .map(p => ('text' in p ? p.text : paramText(params[p.placeholder])))
-    .join('');
+  let out = '';
+  for (const p of templateParts(template)) {
+    out += 'text' in p ? p.text : withoutRepeatedArticle(out, paramText(params[p.placeholder]));
+  }
+  return out;
 }
 
 /** Render a {@link TMessage} as a plain string in the language `t` speaks. */

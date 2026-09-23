@@ -43,6 +43,8 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
 
 ## Where it stands
 
+- 2026-09-23: HOLZMAN-201 merged — invite pages no longer say "the The Levi Family calendar". No
+  schema change. Tests: **58 files / 734 tests, 0 skipped**.
 - 2026-09-16: HOLZMAN-185 and HOLZMAN-194 merged — the last English-only admin error is gone, and
   neither surface swallows a failed save any more. No schema change.
 - 2026-09-14: HOLZMAN-181 (#2), HOLZMAN-182 (#3) and HOLZMAN-183 (#4) merged and deployed.
@@ -62,6 +64,26 @@ tree, Google OAuth + invite links for sign-in (no passwords). Hosted free at
   still set it.
 
 ## Log
+
+### 2026-09-23 — "the The Levi Family calendar" (HOLZMAN-201)
+
+- **Every English invite page doubled the article.** Six strings (`invite_land.title`,
+  `invite_confirm.title`, `invite_member.title`, `invite_expired.body`, `invite_revoked.body`,
+  `joined.title`) wrap `{family}` in "the … calendar", and the onboarding placeholder itself
+  suggests naming the family "The Levy Family" — so a family that took the hint showed every
+  invited relative "You're invited to the The Levy Family calendar". Found while filming the demo
+  video, on the fictional demo family.
+- **The rule lives where the sentence meets the data**, not in the six strings:
+  `withoutRepeatedArticle(textBefore, value)` in `lib/translations.ts` drops the value's leading
+  "The" when the text right before the placeholder already ends in "the" (whole words only, any
+  case). All three fill paths use it — `<Interpolated>`, `<InterpolatedMany>` and `fillTemplate`
+  — so any sentence written "the {x}" later is covered too. Hebrew templates never contain
+  "the", so they are untouched; the family's own stored name is untouched.
+- `interpolated-article.test.tsx` enumerates EVERY English template with a placeholder after
+  "the " (not a hand-kept list) and renders each through all three paths with "The Levi Family".
+  Mutation-checked: removing the rule from any one of the three paths fails that path's tests
+  (7 / 6 / 6). Verified on the real `/join/<token>` page against the demo family: "You're invited
+  to the Levi Family calendar"; Hebrew unchanged.
 
 ### 2026-09-16 — the last English-only error, and the first tests that click
 
