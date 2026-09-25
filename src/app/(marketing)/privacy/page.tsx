@@ -66,10 +66,10 @@ export default function PrivacyPage() {
           Family Calendar is built and run by Holzman AI &amp; Automations
           (Shmuel Holzman) ·{' '}
           <a
-            href="mailto:holzmanshmuel@gmail.com"
+            href="mailto:shmuel@holzman.ai"
             className="ennote text-ink-muted hover:text-ink transition-colors"
           >
-            holzmanshmuel@gmail.com
+            shmuel@holzman.ai
           </a>
         </>
       ),

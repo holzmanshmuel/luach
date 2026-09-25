@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **holzmanshmuel@gmail.com** with "Luach security" in the subject.
+Email **shmuel@holzman.ai** with "Luach security" in the subject.
 
 Please include what you found, how to reproduce it, and what an attacker could
 reach with it. If you have a proof of concept, a minimal one is ideal.
