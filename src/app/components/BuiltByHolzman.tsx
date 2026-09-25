@@ -24,7 +24,7 @@ export function BuiltByHolzman({ lang }: { lang: Lang }) {
           ·
         </span>
         <a
-          href="mailto:holzmanshmuel@gmail.com?subject=Family%20Calendar%20help"
+          href="mailto:shmuel@holzman.ai?subject=Family%20Calendar%20help"
           className="text-ink-muted hover:text-ink transition-colors"
         >
           {t('footer.need_help')}
