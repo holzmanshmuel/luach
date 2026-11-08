@@ -4,6 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-1D4ED8)](./LICENSE)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-1D4ED8?logo=nextdotjs)](https://nextjs.org)
 
+> **No longer maintained (November 2026).** Luach is retired: the hosted instance is shut down
+> and this repository is archived. The code stays here under the MIT license, and you are
+> welcome to fork and self-host it.
+
 **The Hebrew–English family calendar.** Every birthday, anniversary and
 yahrzeit — on both the Hebrew and the Gregorian date, in both Hebrew and
 English, shared with the whole family.
@@ -15,8 +19,7 @@ straight in a spreadsheet is how yahrzeits get missed. Luach keeps both dates
 for every occasion, shows whichever one you think in, and pushes the reminders
 out to the people who need them.
 
-**Hosted free at [family-calendar.holzman-ai.com](https://family-calendar.holzman-ai.com)**
-— or self-host it; the whole thing is in this repo.
+Self-host it: the whole thing is in this repo.
 
 ![Luach's month grid in English](./docs/screenshots/month-english.png)
 
@@ -292,5 +295,4 @@ Security issues go to [SECURITY.md](./SECURITY.md), not the public tracker.
 ---
 
 Source: **[github.com/holzmanshmuel/luach](https://github.com/holzmanshmuel/luach)** ·
-Hosted free at **[family-calendar.holzman-ai.com](https://family-calendar.holzman-ai.com)** ·
 Built by **[Holzman AI & Automations](https://holzman-ai.com)**
